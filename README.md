@@ -15,6 +15,7 @@ The calculators are implemented as web-based tools and are organized into indivi
 
 ## Repository Structure
 
+```
 AzureLocal-Calculator/ 
 ├── Calculators/ 
 │ ├── StorageCalculator/ 
@@ -22,7 +23,7 @@ AzureLocal-Calculator/
 │ └── PricingCalculator/ (under development) 
 ├── README.md
 └── LICENSE
-
+```
 
 ## Interactive Demo
 
