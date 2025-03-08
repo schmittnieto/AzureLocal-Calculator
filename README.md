@@ -1,6 +1,6 @@
 # AzureLocal-Calculator
 
-AzureLocal-Calculator is a repository that provides a set of interactive calculators for estimating key metrics in an Azure Local environment, including Storage, CPU, and Pricing estimation.
+AzureLocal-Calculator is a repository that provides a set of interactive calculators for estimating key metrics in an Azure Local environment, including Storage, CPU and Pricing estimation.
 
 The calculators are implemented as web-based tools and are organized into individual folders under the `Calculators` directory. They are also available for interactive use on my blog at [Azure Local Calculator](https://schmitt-nieto.com/azurelocal-calculator/).
 
