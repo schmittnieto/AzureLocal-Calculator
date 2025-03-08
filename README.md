@@ -7,7 +7,7 @@ The calculators are implemented as web-based tools and are organized into indivi
 ## Calculators
 
 - **Storage Calculator:**  
-  Estimates raw, effective, and usable storage capacity based on node count, disk count, specified capacity per disk, and efficiency factors.
+  Estimates raw, effective, and usable storage capacity based on node count, disk count, specified capacity per disk and efficiency factors, when using Azure Local and configuring storage via Express Settings.
 - **CPU Calculator:**  
   (Under development) Provides CPU performance estimation.
 - **Pricing Calculator:**  
