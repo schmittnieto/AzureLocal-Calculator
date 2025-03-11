@@ -11,7 +11,7 @@ The calculators are implemented as web-based tools and are organized into indivi
 - **CPU Calculator:**  
   (Under development) Provides CPU performance estimation.
 - **Pricing Calculator:**  
-  (Under development) Provides cost estimation for the Azure Local environment.
+  Provides cost estimation for the Azure Local environment.
 
 ## Repository Structure
 
@@ -20,7 +20,7 @@ AzureLocal-Calculator/
 ├── Calculators/ 
 │ ├── StorageCalculator/ 
 │ ├── CPUCalculator/ (under development) 
-│ └── PricingCalculator/ (under development) 
+│ └── PricingCalculator/ 
 ├── README.md
 └── LICENSE
 ```
