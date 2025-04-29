@@ -4,10 +4,13 @@ AzureLocal-Calculator is a repository that provides a set of interactive calcula
 
 The calculators are implemented as web-based tools and are organized into individual folders under the `Calculators` directory. They are also available for interactive use on my blog at [Azure Local Calculator](https://schmitt-nieto.com/azurelocal-calculator/).
 
+> [!IMPORTANT]  
+> The storage calculator I designed is now outdated, as [Armin](https://www.linkedin.com/in/aoberneder/) has created a much better one. For this reason, I will not continue developing mine, and I recommend using Armin’s calculator for this purpose: [s2d-calculator.com](https://s2d-calculator.com/).
+
 ## Calculators
 
-- **Storage Calculator:**  
-  Estimates raw, effective, and usable storage capacity based on node count, disk count, specified capacity per disk and efficiency factors, when using Azure Local and configuring storage via Express Settings.
+- **Storage Calculator:**
+   Estimates raw, effective, and usable storage capacity based on node count, disk count, specified capacity per disk and efficiency factors, when using Azure Local and configuring storage via Express Settings.
 - **CPU Calculator:**  
   (Under development) Provides CPU performance estimation.
 - **Pricing Calculator:**  
