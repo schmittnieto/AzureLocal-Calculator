@@ -4,97 +4,106 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    *{box-sizing:border-box}
-    body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1d1d1f}
-    .container{max-width:900px;margin:0 auto;padding:16px}
+    #storageV2_calcRoot,
+    #storageV2_calcRoot *{box-sizing:border-box}
+    #storageV2_calcRoot{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;max-width:900px;margin:20px auto;padding:0 16px;text-align:center}
+    #storageV2_calcRoot h3{font-size:1.5em;margin-bottom:20px}
 
-    .card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:20px 24px;margin-bottom:16px}
-    .card h3{margin:0 0 16px;font-size:1.15em;color:#333;border-bottom:2px solid #007aff;padding-bottom:8px;display:inline-block}
+    #storageV2_calcRoot .card{margin:20px 0;padding:0;text-align:left}
+    #storageV2_calcRoot .card h3{margin:0 0 20px;font-size:1.5em}
 
-    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px}
-    @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
-    .form-group{display:flex;flex-direction:column}
-    .form-group.full{grid-column:1/-1}
-    .form-group label{font-size:.85em;font-weight:600;margin-bottom:4px;color:#555}
-    .form-group input[type=number],
-    .form-group select{padding:10px 12px;border:1px solid #ccc;border-radius:8px;font-size:.95em;background:#fafafa;transition:border-color .2s}
-    .form-group input[type=number]:focus,
-    .form-group select:focus{outline:none;border-color:#007aff;background:#fff}
+    #storageV2_calcRoot .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px}
+    @media(max-width:700px){#storageV2_calcRoot .form-grid{grid-template-columns:1fr}}
+    #storageV2_calcRoot .form-group{display:flex;flex-direction:column}
+    #storageV2_calcRoot .form-group.full{grid-column:1/-1}
+    #storageV2_calcRoot .form-group label,
+    #storageV2_calcRoot label{display:block;margin-bottom:5px;font-weight:600}
+    #storageV2_calcRoot .form-group input[type=number],
+    #storageV2_calcRoot .form-group select{
+      width:100%;
+      padding:8px;
+      border:1px solid #555;
+      border-radius:8px;
+      box-sizing:border-box;
+      margin-top:5px
+    }
+    #storageV2_calcRoot .form-group select{background:#444;color:#fff}
+    #storageV2_calcRoot .form-group input[type=number]:focus,
+    #storageV2_calcRoot .form-group select:focus{outline:none}
 
-    .chk-row{display:flex;align-items:center;gap:8px;padding:4px 0}
-    .chk-row input[type=checkbox]{width:18px;height:18px;accent-color:#007aff;cursor:pointer}
-    .chk-row label{font-size:.88em;font-weight:500;cursor:pointer;color:#444}
+    #storageV2_calcRoot .chk-row{display:flex;align-items:center;margin-bottom:10px}
+    #storageV2_calcRoot .chk-row input[type=checkbox]{margin-right:8px;transform:scale(1.2)}
+    #storageV2_calcRoot .chk-row label{margin:0;font-weight:600}
 
-    .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
-    .btn{border:none;border-radius:8px;padding:12px 24px;font-size:.95em;font-weight:600;cursor:pointer;transition:background .2s}
-    .btn-primary{background:#007aff;color:#fff}
-    .btn-primary:hover{background:#005ecb}
-    .btn-secondary{background:#f0f0f0;color:#333;border:1px solid #ccc}
-    .btn-secondary:hover{background:#e0e0e0}
+    #storageV2_calcRoot .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+    #storageV2_calcRoot .btn,
+    #storageV2_calcRoot button{background:#007aff;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:1em;cursor:pointer;margin-top:20px}
+    #storageV2_calcRoot .btn:hover,
+    #storageV2_calcRoot button:hover{background:#005bb5}
+    #storageV2_calcRoot .btn-secondary{background:#555;color:#fff}
+    #storageV2_calcRoot .btn-secondary:hover{background:#3d3d3d}
 
-    .result-box{background:#f7f9fc;border:1px solid #dde4ee;border-radius:10px;padding:16px 20px;margin-top:16px;text-align:left;font-size:.92em;line-height:1.7}
-    .result-box strong{color:#333}
-    .warning{color:#cc3300;font-weight:600}
-    .ok{color:#2e7d32;font-weight:600}
+    #storageV2_calcRoot .result-box{margin-top:20px;text-align:left;font-size:.95em;line-height:1.7}
+    #storageV2_calcRoot .warning{color:#cc3300;font-weight:600}
+    #storageV2_calcRoot .ok{color:#2e7d32;font-weight:600}
 
-    .charts-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
-    .chart-wrapper{background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px;position:relative;height:320px}
-    .chart-wrapper canvas{width:100%!important;height:100%!important}
-    @media(min-width:700px){.charts-grid.two-col{grid-template-columns:1fr 1fr}}
+    #storageV2_calcRoot .charts-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:20px}
+    @media(min-width:700px){#storageV2_calcRoot .charts-grid.two-col{grid-template-columns:1fr 1fr}}
+    #storageV2_calcRoot .chart-wrapper{position:relative;height:320px;text-align:center}
+    #storageV2_calcRoot .chart-wrapper canvas{background:#fff;border-radius:8px;width:100%!important;height:100%!important}
 
-    .overview-table{width:100%;border-collapse:collapse;font-size:.88em;margin-top:12px}
-    .overview-table th,.overview-table td{padding:8px 10px;text-align:left;border-bottom:1px solid #e5e5e5}
-    .overview-table th{background:#f5f7fa;font-weight:600;color:#444}
-    .overview-table td:last-child{text-align:right;font-variant-numeric:tabular-nums}
-    .overview-table .section-header{background:#eaf0fb;font-weight:700;color:#007aff;font-size:.92em}
-    .overview-table .total-row{font-weight:700;background:#f0f4ff}
-    .overview-table .formula{color:#888;font-size:.82em}
+    #storageV2_calcRoot .overview-table{width:100%;border-collapse:collapse;margin-top:15px;text-align:left;font-size:.9em}
+    #storageV2_calcRoot .overview-table th,
+    #storageV2_calcRoot .overview-table td{padding:8px 10px;border-bottom:1px solid #555}
+    #storageV2_calcRoot .overview-table th{font-weight:600}
+    #storageV2_calcRoot .overview-table td:last-child{text-align:right}
+    #storageV2_calcRoot .overview-table .section-header{font-weight:700;color:#007aff}
+    #storageV2_calcRoot .overview-table .total-row{font-weight:700}
+    #storageV2_calcRoot .overview-table .formula{font-size:.86em;opacity:.8}
 
-    /* Resiliency option cards */
-    .res-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px}
-    .res-option{border:2px solid #e0e0e0;border-radius:10px;padding:12px;cursor:pointer;transition:border-color .2s,background .2s}
-    .res-option:hover:not(.disabled){border-color:#007aff;background:#f7f9fc}
-    .res-option.selected{border-color:#007aff;background:#eaf0fb}
-    .res-option.disabled{opacity:.4;cursor:not-allowed}
-    .res-option .res-name{font-weight:700;font-size:.9em;margin-bottom:4px;color:#333}
-    .res-option .res-detail{font-size:.78em;color:#666;line-height:1.4}
-    .res-option .res-eff{font-size:.82em;font-weight:600;color:#007aff;margin-top:4px}
+    #storageV2_calcRoot .res-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px}
+    #storageV2_calcRoot .res-option{border:1px solid #555;border-radius:8px;padding:12px;cursor:pointer;transition:border-color .2s}
+    #storageV2_calcRoot .res-option:hover:not(.disabled){border-color:#007aff}
+    #storageV2_calcRoot .res-option.selected{border-color:#007aff}
+    #storageV2_calcRoot .res-option.disabled{opacity:.4;cursor:not-allowed}
+    #storageV2_calcRoot .res-option .res-name{font-weight:700;font-size:.9em;margin-bottom:4px}
+    #storageV2_calcRoot .res-option .res-detail{font-size:.78em;line-height:1.4;opacity:.85}
+    #storageV2_calcRoot .res-option .res-eff{font-size:.82em;font-weight:600;color:#007aff;margin-top:4px}
 
-    /* Calculation mode tabs */
-    .mode-tabs{display:flex;border-radius:8px;overflow:hidden;border:1px solid #ccc;margin-bottom:16px}
-    .mode-tab{flex:1;padding:10px 12px;border:none;cursor:pointer;font-weight:600;font-size:.88em;transition:background .2s;background:#f0f0f0;color:#555}
-    .mode-tab.active{background:#007aff;color:#fff}
-    .mode-tab:not(:last-child){border-right:1px solid #ccc}
+    #storageV2_calcRoot .mode-tabs{display:flex;border-radius:8px;overflow:hidden;border:1px solid #555;margin-bottom:16px}
+    #storageV2_calcRoot .mode-tab{flex:1;padding:10px 12px;border:none;cursor:pointer;font-weight:600;font-size:.88em;background:#444;color:#fff;margin-top:0;border-radius:0}
+    #storageV2_calcRoot .mode-tab:hover{background:#555}
+    #storageV2_calcRoot .mode-tab.active{background:#007aff;color:#fff}
+    #storageV2_calcRoot .mode-tab:not(:last-child){border-right:1px solid #555}
 
-    /* Drive size checkboxes (Mode B) */
-    .size-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px}
-    .size-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;transition:border-color .2s,background .2s;user-select:none}
-    .size-opt.checked{border-color:#007aff;background:#eaf0fb}
-    .size-opt input[type=checkbox]{width:16px;height:16px;accent-color:#007aff;cursor:pointer;flex-shrink:0}
-    .size-opt span{font-size:.88em;font-weight:500;color:#333}
+    #storageV2_calcRoot .size-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px}
+    #storageV2_calcRoot .size-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #555;border-radius:8px;cursor:pointer;transition:border-color .2s;user-select:none}
+    #storageV2_calcRoot .size-opt.checked{border-color:#007aff}
+    #storageV2_calcRoot .size-opt input[type=checkbox]{width:16px;height:16px;accent-color:#007aff;cursor:pointer;flex-shrink:0}
+    #storageV2_calcRoot .size-opt span{font-size:.88em;font-weight:500}
 
-    /* Comparison table (Mode B) */
-    .compare-table{width:100%;border-collapse:collapse;font-size:.88em;margin-top:4px}
-    .compare-table th,.compare-table td{padding:8px 10px;text-align:right;border-bottom:1px solid #e5e5e5}
-    .compare-table th:first-child,.compare-table td:first-child{text-align:left}
-    .compare-table th{background:#f5f7fa;font-weight:600;color:#444}
-    .compare-table .infeasible{opacity:.5}
-    .compare-table .best td{background:#f0faf3}
+    #storageV2_calcRoot .compare-table{width:100%;border-collapse:collapse;font-size:.88em;margin-top:4px}
+    #storageV2_calcRoot .compare-table th,
+    #storageV2_calcRoot .compare-table td{padding:8px 10px;text-align:right;border-bottom:1px solid #555}
+    #storageV2_calcRoot .compare-table th:first-child,
+    #storageV2_calcRoot .compare-table td:first-child{text-align:left}
+    #storageV2_calcRoot .compare-table th{font-weight:600}
+    #storageV2_calcRoot .compare-table .infeasible{opacity:.5}
+    #storageV2_calcRoot .compare-table .best td{color:#2e7d32;font-weight:700}
 
-    .disclaimer{font-size:.78em;color:#666;margin-top:16px;text-align:left;line-height:1.6}
-    .disclaimer a{color:#007aff;text-decoration:none}
-    .disclaimer a:hover{text-decoration:underline}
-    .disclaimer strong{color:#444}
+    #storageV2_calcRoot .disclaimer{font-size:.8em;margin-top:20px;text-align:left;line-height:1.6}
+    #storageV2_calcRoot .disclaimer a{color:#007aff;text-decoration:none}
+    #storageV2_calcRoot .disclaimer a:hover{text-decoration:underline}
 
     @media print{
-      .btn-row,.no-print{display:none!important}
-      .card{break-inside:avoid;border:none;box-shadow:none}
-      .chart-wrapper{height:260px}
+      #storageV2_calcRoot .btn-row,#storageV2_calcRoot .no-print{display:none!important}
+      #storageV2_calcRoot .card,#storageV2_calcRoot .chart-wrapper{break-inside:avoid}
+      #storageV2_calcRoot .chart-wrapper{height:260px}
     }
   </style>
 </head>
 <body>
-<div class="container" id="calcRoot">
+<div class="container" id="storageV2_calcRoot">
 
   <!-- Card 1: Cluster Configuration -->
   <div class="card">
@@ -102,13 +111,13 @@
     <div class="form-grid">
       <div class="form-group full">
         <div class="chk-row">
-          <input type="checkbox" id="singleNode">
-          <label for="singleNode">Single Node Cluster</label>
+          <input type="checkbox" id="storageV2_singleNode">
+          <label for="storageV2_singleNode">Single Node Cluster</label>
         </div>
       </div>
-      <div class="form-group" id="nodeCountGroup">
-        <label for="nodeCount">Number of Nodes</label>
-        <select id="nodeCount"></select>
+      <div class="form-group" id="storageV2_nodeCountGroup">
+        <label for="storageV2_nodeCount">Number of Nodes</label>
+        <select id="storageV2_nodeCount"></select>
       </div>
     </div>
   </div>
@@ -116,23 +125,23 @@
   <!-- Card 2: Calculation Mode -->
   <div class="card">
     <h3>Calculation Mode</h3>
-    <p style="font-size:.85em;color:#666;margin:0 0 12px">Choose your starting point: specify your drives to calculate effective storage, or set a storage target to find the required drives.</p>
+    <p style="font-size:.85em;color:inherit;margin:0 0 12px">Choose your starting point: specify your drives to calculate effective storage, or set a storage target to find the required drives.</p>
 
     <div class="mode-tabs">
-      <button class="mode-tab active" id="modeABtn">I know my drives - calculate storage</button>
-      <button class="mode-tab" id="modeBBtn">I have a storage target - calculate drives</button>
+      <button class="mode-tab active" id="storageV2_modeABtn">I know my drives - calculate storage</button>
+      <button class="mode-tab" id="storageV2_modeBBtn">I have a storage target - calculate drives</button>
     </div>
 
     <!-- Mode A: Drive Configuration -->
-    <div id="modeAPanel">
+    <div id="storageV2_modeAPanel">
       <div class="form-grid">
         <div class="form-group">
-          <label for="ffCount">NVMe Drives per Node</label>
-          <input type="number" id="ffCount" value="4" min="1" max="24" step="1">
+          <label for="storageV2_ffCount">NVMe Drives per Node</label>
+          <input type="number" id="storageV2_ffCount" value="4" min="1" max="24" step="1">
         </div>
         <div class="form-group">
-          <label for="ffCapacity">NVMe Drive Capacity</label>
-          <select id="ffCapacity">
+          <label for="storageV2_ffCapacity">NVMe Drive Capacity</label>
+          <select id="storageV2_ffCapacity">
             <option value="0.96">0.96 TB (960 GB)</option>
             <option value="1.92" selected>1.92 TB</option>
             <option value="3.84">3.84 TB</option>
@@ -142,27 +151,27 @@
             <option value="custom">Custom...</option>
           </select>
         </div>
-        <div class="form-group full" id="ffCapacityCustomGroup" style="display:none">
-          <label for="ffCapacityCustom">Custom Drive Capacity (TB)</label>
-          <input type="number" id="ffCapacityCustom" value="1.92" min="0.01" max="61.44" step="0.01">
+        <div class="form-group full" id="storageV2_ffCapacityCustomGroup" style="display:none">
+          <label for="storageV2_ffCapacityCustom">Custom Drive Capacity (TB)</label>
+          <input type="number" id="storageV2_ffCapacityCustom" value="1.92" min="0.01" max="61.44" step="0.01">
         </div>
       </div>
     </div>
 
     <!-- Mode B: Target Storage -->
-    <div id="modeBPanel" style="display:none">
+    <div id="storageV2_modeBPanel" style="display:none">
       <div class="form-grid">
         <div class="form-group full">
-          <label for="targetStorage">Target Effective Storage (TB)</label>
-          <input type="number" id="targetStorage" value="20" min="0.1" step="0.1">
+          <label for="storageV2_targetStorage">Target Effective Storage (TB)</label>
+          <input type="number" id="storageV2_targetStorage" value="20" min="0.1" step="0.1">
         </div>
       </div>
-      <p style="font-size:.85em;font-weight:600;color:#555;margin:14px 0 4px">NVMe Drive Sizes to Evaluate</p>
-      <div class="size-options" id="driveSizeOptions"></div>
+      <p style="font-size:.85em;font-weight:600;color:inherit;margin:14px 0 4px">NVMe Drive Sizes to Evaluate</p>
+      <div class="size-options" id="storageV2_driveSizeOptions"></div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
-        <label for="customDriveSize" style="font-size:.85em;font-weight:600;color:#555">Custom size (TB):</label>
-        <input type="number" id="customDriveSize" placeholder="e.g. 3.84" min="0.01" step="0.01"
-          style="width:130px;padding:8px 10px;border:1px solid #ccc;border-radius:8px;font-size:.9em;background:#fafafa">
+        <label for="storageV2_customDriveSize" style="font-size:.85em;font-weight:600;color:inherit">Custom size (TB):</label>
+        <input type="number" id="storageV2_customDriveSize" placeholder="e.g. 3.84" min="0.01" step="0.01"
+          style="width:130px;padding:8px 10px;border:1px solid #555;border-radius:8px;font-size:.9em">
       </div>
     </div>
   </div>
@@ -170,38 +179,38 @@
   <!-- Card 3: Storage Resiliency -->
   <div class="card">
     <h3>Storage Resiliency</h3>
-    <p style="font-size:.85em;color:#666;margin:0 0 10px">Available options depend on your cluster size.</p>
-    <div id="resiliencyOptions" class="res-options"></div>
+    <p style="font-size:.85em;color:inherit;margin:0 0 10px">Available options depend on your cluster size.</p>
+    <div id="storageV2_resiliencyOptions" class="res-options"></div>
   </div>
 
   <!-- Actions -->
   <div class="btn-row">
-    <button class="btn btn-primary" id="calcBtn">Calculate</button>
-    <button class="btn btn-secondary" id="exportPdfBtn" style="display:none">Export to PDF</button>
+    <button class="btn btn-primary" id="storageV2_calcBtn">Calculate</button>
+    <button class="btn btn-secondary" id="storageV2_exportPdfBtn" style="display:none">Export to PDF</button>
   </div>
 
   <!-- Results -->
-  <div id="resultBox" class="result-box" style="display:none"></div>
+  <div id="storageV2_resultBox" class="result-box" style="display:none"></div>
 
   <!-- Charts (Mode A) -->
-  <div id="chartsSection" style="display:none">
+  <div id="storageV2_chartsSection" style="display:none">
     <div class="charts-grid two-col">
-      <div class="chart-wrapper"><canvas id="capacityChart"></canvas></div>
-      <div class="chart-wrapper"><canvas id="volumesChart"></canvas></div>
+      <div class="chart-wrapper"><canvas id="storageV2_capacityChart"></canvas></div>
+      <div class="chart-wrapper"><canvas id="storageV2_volumesChart"></canvas></div>
     </div>
   </div>
 
   <!-- Comparison Table (Mode B) -->
-  <div id="compareSection" class="card" style="display:none">
+  <div id="storageV2_compareSection" class="card" style="display:none">
     <h3>Drive Size Comparison</h3>
-    <p style="font-size:.82em;color:#666;margin:0 0 8px">Minimum drives per node required to meet or exceed the target for each drive size. Rows marked with * require more than 24 drives per node and are not feasible in standard servers.</p>
-    <table class="compare-table" id="compareTable"></table>
+    <p style="font-size:.82em;color:inherit;margin:0 0 8px">Minimum drives per node required to meet or exceed the target for each drive size. Rows marked with * require more than 24 drives per node and are not feasible in standard servers.</p>
+    <table class="compare-table" id="storageV2_compareTable"></table>
   </div>
 
   <!-- Overview (Mode A) -->
-  <div id="overviewSection" class="card" style="display:none">
+  <div id="storageV2_overviewSection" class="card" style="display:none">
     <h3>Full Overview</h3>
-    <table class="overview-table" id="overviewTable"></table>
+    <table class="overview-table" id="storageV2_overviewTable"></table>
   </div>
 
   <!-- Disclaimers -->
@@ -253,6 +262,8 @@
 
   var capChart = null, volChart = null;
   var selectedResiliency = "two-way";
+  var selectedResiliencyByMode = { A: "two-way", B: "two-way" };
+  var resiliencyUserSelectedByMode = { A: false, B: false };
   var activeMode = "A";
 
   var COMMON_SIZES  = [0.96, 1.92, 3.84, 7.68, 15.36, 30.72];
@@ -283,12 +294,18 @@
     return r ? r.name : id;
   }
 
+  function getDefaultResiliency(nodes) {
+    if (nodes >= 3 && isResAvailable(resiliencyDefs[1], nodes)) return "three-way";
+    if (isResAvailable(resiliencyDefs[0], nodes)) return "two-way";
+    return null;
+  }
+
   /* ================================================================
      INIT
      ================================================================ */
   (function init() {
     // Node count dropdown
-    var sel = $("nodeCount");
+    var sel = $("storageV2_nodeCount");
     for (var i = 2; i <= 16; i++) {
       var opt = document.createElement("option");
       opt.value = i; opt.textContent = i;
@@ -296,26 +313,24 @@
     }
 
     // Drive size checkboxes for Mode B
-    var container = $("driveSizeOptions");
+    var container = $("storageV2_driveSizeOptions");
     COMMON_SIZES.forEach(function(size) {
       var wrap = document.createElement("label");
       wrap.className = "size-opt checked";
-      wrap.style.cssText = "border-color:#007aff;background:#eaf0fb";
+      wrap.style.cssText = "border-color:#007aff";
 
       var chk = document.createElement("input");
       chk.type = "checkbox";
-      chk.className = "drive-size-chk";
+      chk.className = "storageV2-drive-size-chk";
       chk.value = size;
       chk.checked = true;
       chk.addEventListener("change", function() {
         if (this.checked) {
           wrap.classList.add("checked");
           wrap.style.borderColor = "#007aff";
-          wrap.style.background  = "#eaf0fb";
         } else {
           wrap.classList.remove("checked");
-          wrap.style.borderColor = "#e0e0e0";
-          wrap.style.background  = "";
+          wrap.style.borderColor = "#555";
         }
       });
 
@@ -334,14 +349,14 @@
      HELPERS
      ================================================================ */
   function getNodes() {
-    return $("singleNode").checked ? 1 : (parseInt($("nodeCount").value) || 2);
+    return $("storageV2_singleNode").checked ? 1 : (parseInt($("storageV2_nodeCount").value) || 2);
   }
 
   function fmtTB(v) { return v.toFixed(2) + " TB"; }
 
   function getDriveCapA() {
-    var sel = $("ffCapacity");
-    if (sel.value === "custom") return Math.max(num($("ffCapacityCustom")), 0.01);
+    var sel = $("storageV2_ffCapacity");
+    if (sel.value === "custom") return Math.max(num($("storageV2_ffCapacityCustom")), 0.01);
     return parseFloat(sel.value) || 1.92;
   }
 
@@ -397,55 +412,60 @@
   /* ================================================================
      EVENT LISTENERS
      ================================================================ */
-  $("singleNode").addEventListener("change", function() {
-    $("nodeCountGroup").style.display = this.checked ? "none" : "";
+  $("storageV2_singleNode").addEventListener("change", function() {
+    $("storageV2_nodeCountGroup").style.display = this.checked ? "none" : "";
     updateResiliencyOptions();
   });
 
-  $("nodeCount").addEventListener("change", updateResiliencyOptions);
+  $("storageV2_nodeCount").addEventListener("change", updateResiliencyOptions);
 
-  $("ffCapacity").addEventListener("change", function() {
-    $("ffCapacityCustomGroup").style.display = this.value === "custom" ? "" : "none";
+  $("storageV2_ffCapacity").addEventListener("change", function() {
+    $("storageV2_ffCapacityCustomGroup").style.display = this.value === "custom" ? "" : "none";
   });
 
   function switchMode(mode) {
     activeMode = mode;
-    $("modeABtn").classList.toggle("active", mode === "A");
-    $("modeBBtn").classList.toggle("active", mode === "B");
-    $("modeAPanel").style.display = mode === "A" ? "" : "none";
-    $("modeBPanel").style.display = mode === "B" ? "" : "none";
-    $("resultBox").style.display       = "none";
-    $("chartsSection").style.display   = "none";
-    $("compareSection").style.display  = "none";
-    $("overviewSection").style.display = "none";
-    $("exportPdfBtn").style.display    = "none";
+    selectedResiliency = selectedResiliencyByMode[mode] || selectedResiliency;
+    $("storageV2_modeABtn").classList.toggle("active", mode === "A");
+    $("storageV2_modeBBtn").classList.toggle("active", mode === "B");
+    $("storageV2_modeAPanel").style.display = mode === "A" ? "" : "none";
+    $("storageV2_modeBPanel").style.display = mode === "B" ? "" : "none";
+    $("storageV2_resultBox").style.display       = "none";
+    $("storageV2_chartsSection").style.display   = "none";
+    $("storageV2_compareSection").style.display  = "none";
+    $("storageV2_overviewSection").style.display = "none";
+    $("storageV2_exportPdfBtn").style.display    = "none";
+    updateResiliencyOptions();
   }
 
-  $("modeABtn").addEventListener("click", function() { switchMode("A"); });
-  $("modeBBtn").addEventListener("click", function() { switchMode("B"); });
-  $("calcBtn").addEventListener("click", function() {
+  $("storageV2_modeABtn").addEventListener("click", function() { switchMode("A"); });
+  $("storageV2_modeBBtn").addEventListener("click", function() { switchMode("B"); });
+  $("storageV2_calcBtn").addEventListener("click", function() {
     if (activeMode === "A") calculateForward();
     else calculateReverse();
   });
-  $("exportPdfBtn").addEventListener("click", exportPdf);
+  $("storageV2_exportPdfBtn").addEventListener("click", exportPdf);
 
   /* ================================================================
      RESILIENCY OPTIONS UI
      ================================================================ */
   function updateResiliencyOptions() {
     var nodes = getNodes();
-    var container = $("resiliencyOptions");
+    var container = $("storageV2_resiliencyOptions");
     container.innerHTML = "";
 
     var firstAvailable    = null;
     var currentStillValid = false;
+    var preferredDefault  = getDefaultResiliency(nodes);
+
+    selectedResiliency = selectedResiliencyByMode[activeMode] || selectedResiliency;
 
     resiliencyDefs.forEach(function(r) {
       var available = isResAvailable(r, nodes);
       var eff = getEfficiency(r.id, nodes);
 
       var warning = r.id === "dual-parity"
-        ? '<div style="font-size:.74em;color:#cc3300;font-weight:600;margin-top:6px;padding:4px 6px;background:#fff3f0;border-radius:4px;border-left:2px solid #cc3300">Not recommended for standard deployments. Deviates from the standard configuration - only use if you know what you are doing.</div>'
+        ? '<div style="font-size:.74em;color:#cc3300;font-weight:600;margin-top:6px">Not recommended for standard deployments. Deviates from the standard configuration, only use if you know what you are doing.</div>'
         : "";
 
       var div = document.createElement("div");
@@ -463,7 +483,9 @@
         if (selectedResiliency === r.id) currentStillValid = true;
         (function(rid) {
           div.addEventListener("click", function() {
+            resiliencyUserSelectedByMode[activeMode] = true;
             selectedResiliency = rid;
+            selectedResiliencyByMode[activeMode] = rid;
             updateResiliencyOptions();
           });
         })(r.id);
@@ -471,8 +493,16 @@
       container.appendChild(div);
     });
 
-    if (!currentStillValid && firstAvailable) {
-      selectedResiliency = firstAvailable;
+    if (!currentStillValid && (preferredDefault || firstAvailable)) {
+      selectedResiliency = preferredDefault || firstAvailable;
+      selectedResiliencyByMode[activeMode] = selectedResiliency;
+      updateResiliencyOptions();
+      return;
+    }
+
+    if (!resiliencyUserSelectedByMode[activeMode] && preferredDefault && selectedResiliency !== preferredDefault) {
+      selectedResiliency = preferredDefault;
+      selectedResiliencyByMode[activeMode] = selectedResiliency;
       updateResiliencyOptions();
     }
   }
@@ -483,16 +513,16 @@
   function calculateForward() {
     var nodes      = getNodes();
     var driveCap   = getDriveCapA();
-    var driveCount = Math.max(num($("ffCount")), 1);
+    var driveCount = Math.max(num($("storageV2_ffCount")), 1);
     var d          = calcCapacity(nodes, driveCount, driveCap, selectedResiliency);
 
-    var rb = $("resultBox");
+    var rb = $("storageV2_resultBox");
     rb.style.display = "block";
     var h = "";
     h += "<strong>Cluster:</strong> " + nodes + " node" + (nodes > 1 ? "s" : "") + (nodes === 1 ? " (Single Node)" : "") + "<br>";
     h += "<strong>Storage:</strong> Full-Flash NVMe - " + driveCount + " x " + fmtTB(driveCap) + " per node<br>";
     h += "<strong>Resiliency:</strong> " + resiliencyLabel(selectedResiliency) + " (" + (d.efficiency * 100).toFixed(1) + "% efficiency)<br>";
-    h += "<hr style='border:none;border-top:1px solid #dde4ee;margin:8px 0'>";
+    h += "<hr style='border:none;border-top:1px solid #555;margin:8px 0'>";
     h += "<strong>Total Raw per Node:</strong> " + fmtTB(d.rawPerNode) + "<br>";
     h += "<strong>Total Raw (Cluster):</strong> " + fmtTB(d.totalRaw) + "<br>";
     h += "<strong>Reserve Capacity:</strong> " + fmtTB(d.reserveCapacity) + "<br>";
@@ -502,13 +532,13 @@
     h += '<strong>Net Usable Capacity:</strong> <span class="ok">' + fmtTB(d.netUsable) + " (" + d.netUsableTiB.toFixed(2) + " TiB)</span>";
     rb.innerHTML = h;
 
-    $("chartsSection").style.display  = "block";
-    $("compareSection").style.display = "none";
+    $("storageV2_chartsSection").style.display  = "block";
+    $("storageV2_compareSection").style.display = "none";
     drawCapacityChart(d.netUsable, d.resiliencyOverhead, d.reserveCapacity, INFRA_OVERHEAD);
     drawVolumesChart(d.infra1, d.clusterPerf, d.userPerNode, nodes);
 
     buildOverview(d);
-    $("exportPdfBtn").style.display = "inline-block";
+    $("storageV2_exportPdfBtn").style.display = "inline-block";
   }
 
   /* ================================================================
@@ -516,13 +546,13 @@
      ================================================================ */
   function calculateReverse() {
     var nodes         = getNodes();
-    var targetStorage = Math.max(num($("targetStorage")), 0.1);
+    var targetStorage = Math.max(num($("storageV2_targetStorage")), 0.1);
 
     var sizes = [];
-    document.querySelectorAll(".drive-size-chk").forEach(function(chk) {
+    $("storageV2_calcRoot").querySelectorAll(".storageV2-drive-size-chk").forEach(function(chk) {
       if (chk.checked) sizes.push(parseFloat(chk.value));
     });
-    var custom = num($("customDriveSize"));
+    var custom = num($("storageV2_customDriveSize"));
     if (custom > 0 && sizes.indexOf(custom) === -1) sizes.push(custom);
     sizes.sort(function(a, b) { return a - b; });
 
@@ -531,16 +561,16 @@
       return;
     }
 
-    var rb = $("resultBox");
+    var rb = $("storageV2_resultBox");
     rb.style.display = "block";
     rb.innerHTML =
       "<strong>Target Effective Storage:</strong> " + fmtTB(targetStorage) + "<br>" +
       "<strong>Cluster:</strong> " + nodes + " node" + (nodes > 1 ? "s" : "") + "<br>" +
       "<strong>Resiliency:</strong> " + resiliencyLabel(selectedResiliency) + " (" + (getEfficiency(selectedResiliency, nodes) * 100).toFixed(1) + "% efficiency)";
 
-    $("chartsSection").style.display  = "none";
-    $("overviewSection").style.display = "none";
-    $("compareSection").style.display = "block";
+    $("storageV2_chartsSection").style.display  = "none";
+    $("storageV2_overviewSection").style.display = "none";
+    $("storageV2_compareSection").style.display = "block";
 
     var results = sizes.map(function(sz) {
       return calcReverse(nodes, sz, targetStorage, selectedResiliency);
@@ -592,8 +622,8 @@
     });
 
     rows.push("</tbody>");
-    $("compareTable").innerHTML = rows.join("");
-    $("exportPdfBtn").style.display = "inline-block";
+    $("storageV2_compareTable").innerHTML = rows.join("");
+    $("storageV2_exportPdfBtn").style.display = "inline-block";
   }
 
   /* ================================================================
@@ -616,7 +646,7 @@
       }
     };
     if (capChart) capChart.destroy();
-    capChart = new Chart($("capacityChart").getContext("2d"), cfg);
+    capChart = new Chart($("storageV2_capacityChart").getContext("2d"), cfg);
   }
 
   function drawVolumesChart(infra1, clusterPerf, userPerNode, nodes) {
@@ -633,14 +663,14 @@
       }
     };
     if (volChart) volChart.destroy();
-    volChart = new Chart($("volumesChart").getContext("2d"), cfg);
+    volChart = new Chart($("storageV2_volumesChart").getContext("2d"), cfg);
   }
 
   /* ================================================================
      OVERVIEW TABLE (Mode A)
      ================================================================ */
   function buildOverview(d) {
-    $("overviewSection").style.display = "block";
+    $("storageV2_overviewSection").style.display = "block";
     var rows = [];
     function sec(t)     { rows.push('<tr class="section-header"><td colspan="3">' + t + '</td></tr>'); }
     function row(l,f,v) { rows.push('<tr><td>' + l + '</td><td class="formula">' + f + '</td><td>' + v + '</td></tr>'); }
@@ -679,19 +709,19 @@
     total("Total Volume Allocation", fmtTB(d.volumeOH + d.remainingForUser));
 
     rows.push("</tbody>");
-    $("overviewTable").innerHTML = rows.join("");
+    $("storageV2_overviewTable").innerHTML = rows.join("");
   }
 
   /* ================================================================
      PDF EXPORT
      ================================================================ */
   function exportPdf() {
-    var btn = $("exportPdfBtn");
+    var btn = $("storageV2_exportPdfBtn");
     btn.textContent = "Generating...";
     btn.disabled = true;
 
     try {
-      var root = $("calcRoot");
+      var root = $("storageV2_calcRoot");
       var chartImages = {};
       root.querySelectorAll("canvas").forEach(function(c) {
         try { chartImages[c.id] = c.toDataURL("image/png"); } catch(e) {}
@@ -728,7 +758,7 @@
         "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>" +
         "<title>Azure Local Storage Calculator - Export</title>" +
         "<style>" + styles + "</style>" +
-        "<style>body{margin:0;padding:16px;background:#fff}.btn-row,.no-print{display:none!important}" +
+        "<style>body{margin:0;padding:16px}.btn-row,.no-print{display:none!important}" +
         "@media print{.btn-row,.no-print{display:none!important}}</style>" +
         "</head><body>" + clone.outerHTML + "</body></html>"
       );

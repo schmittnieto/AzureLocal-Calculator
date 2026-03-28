@@ -5,77 +5,83 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     *{box-sizing:border-box}
-    body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1d1d1f}
-    .container{max-width:900px;margin:0 auto;padding:16px}
+    body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+    .container{margin:20px 0;text-align:center}
+    h3{font-size:1.5em;margin-bottom:20px}
 
-    .card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:20px 24px;margin-bottom:16px}
-    .card h3{margin:0 0 16px;font-size:1.15em;color:#333;border-bottom:2px solid #007aff;padding-bottom:8px;display:inline-block}
+    .card{margin:20px 0;padding:0;text-align:left}
+    .card h3{margin:0 0 20px;font-size:1.5em}
 
     .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px}
-    @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+    @media(max-width:700px){.form-grid{grid-template-columns:1fr}}
     .form-group{display:flex;flex-direction:column}
     .form-group.full{grid-column:1/-1}
-    .form-group label{font-size:.85em;font-weight:600;margin-bottom:4px;color:#555}
-    .form-group input[type=number],
-    .form-group select{padding:10px 12px;border:1px solid #ccc;border-radius:8px;font-size:.95em;background:#fafafa;transition:border-color .2s}
-    .form-group input[type=number]:focus,
-    .form-group select:focus{outline:none;border-color:#007aff;background:#fff}
-    .form-group select{appearance:auto}
 
-    .chk-row{display:flex;align-items:center;gap:8px;padding:4px 0}
-    .chk-row input[type=checkbox]{width:18px;height:18px;accent-color:#007aff;cursor:pointer}
-    .chk-row label{font-size:.88em;font-weight:500;cursor:pointer;color:#444}
+    .form-group label,
+    label{display:block;margin-bottom:5px;font-weight:600}
+
+    input[type=range]{width:100%;margin:10px 0}
+    input[type=number],select{width:100%;padding:8px;border:1px solid #555;border-radius:8px;box-sizing:border-box;margin-top:5px}
+    select{background:#444;color:#fff}
+    input[type=range]{margin:10px 0}
+    input[type=number]:focus,select:focus{outline:none}
+
+    .chk-row{display:flex;align-items:center;margin-bottom:10px}
+    .chk-row input[type=checkbox]{margin-right:8px;transform:scale(1.2)}
+    .chk-row label{margin:0;font-weight:600}
 
     .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
-    .btn{border:none;border-radius:8px;padding:12px 24px;font-size:.95em;font-weight:600;cursor:pointer;transition:background .2s}
-    .btn-primary{background:#007aff;color:#fff}
-    .btn-primary:hover{background:#005ecb}
-    .btn-secondary{background:#f0f0f0;color:#333;border:1px solid #ccc}
-    .btn-secondary:hover{background:#e0e0e0}
+    .btn,button{background:#007aff;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:1em;cursor:pointer;margin-top:20px}
+    .btn:hover,button:hover{background:#005bb5}
+    .btn-secondary{background:#555;color:#fff}
+    .btn-secondary:hover{background:#3d3d3d}
 
-    .result-box{background:#f7f9fc;border:1px solid #dde4ee;border-radius:10px;padding:16px 20px;margin-top:16px;text-align:left;font-size:.92em;line-height:1.7}
-    .result-box strong{color:#333}
+    .mode-tab{background:#444;color:#fff;margin-top:0;border-radius:0}
+    .mode-tab:hover{background:#555}
+    .mode-tab.active,
+    .mode-tab.active:hover{background:#007aff;color:#fff;font-weight:700}
+
+    .result-box{
+      margin-top:20px;
+      text-align:left;
+      font-size:.95em;
+      line-height:1.7
+    }
     .warning{color:#cc3300;font-weight:600}
     .ok{color:#2e7d32;font-weight:600}
 
-    .charts-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
-    .chart-wrapper{background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px;position:relative;height:320px}
-    .chart-wrapper canvas{width:100%!important;height:100%!important}
-    @media(min-width:700px){.charts-grid.two-col{grid-template-columns:1fr 1fr}}
+    .charts-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:20px}
+    @media(min-width:900px){.charts-grid.two-col{grid-template-columns:1fr 1fr}}
+    .chart-wrapper{position:relative;height:320px;text-align:center}
+    .chart-wrapper canvas{background:#fff;border-radius:8px;width:100%!important;height:100%!important}
 
-    .overview-table{width:100%;border-collapse:collapse;font-size:.88em;margin-top:12px}
-    .overview-table th,.overview-table td{padding:8px 10px;text-align:left;border-bottom:1px solid #e5e5e5}
-    .overview-table th{background:#f5f7fa;font-weight:600;color:#444}
-    .overview-table td:last-child{text-align:right;font-variant-numeric:tabular-nums}
-    .overview-table .section-header{background:#eaf0fb;font-weight:700;color:#007aff;font-size:.92em}
-    .overview-table .total-row{font-weight:700;background:#f0f4ff}
-    .overview-table .formula{color:#888;font-size:.82em}
+    .overview-table{width:100%;border-collapse:collapse;margin-top:15px;text-align:left;font-size:.9em}
+    .overview-table th,.overview-table td{padding:8px 10px;border-bottom:1px solid #555}
+    .overview-table th{font-weight:600}
+    .overview-table td:last-child{text-align:right}
+    .overview-table .section-header{font-weight:700}
+    .overview-table .total-row{font-weight:700}
+    .overview-table .formula{font-size:.86em;opacity:.8}
 
-    /* CPU recommendation cards */
     .cpu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px}
-    .cpu-card{border:1px solid #d0d7e2;border-radius:10px;padding:14px;background:#f9fafb;font-size:.86em}
-    .cpu-card.match{border-color:#34c759;background:#f0faf3}
-    .cpu-card.tight{border-color:#ff9500;background:#fff9f0}
-    .cpu-card.no-fit{border-color:#e0e0e0;background:#fafafa;opacity:.55}
-    .cpu-card .cpu-name{font-weight:700;font-size:.95em;margin-bottom:6px;color:#333}
-    .cpu-card .cpu-detail{color:#666;line-height:1.5}
+    .cpu-card{border:1px solid #555;border-radius:8px;padding:12px;font-size:.88em}
+    .cpu-card.match{border-color:#2e7d32}
+    .cpu-card.tight{border-color:#cc7a00}
+    .cpu-card.no-fit{border-color:#888;opacity:.65}
+    .cpu-card .cpu-name{font-weight:700;font-size:.95em;margin-bottom:6px}
+    .cpu-card .cpu-detail{line-height:1.5}
     .cpu-tag{display:inline-block;font-size:.72em;font-weight:700;padding:2px 8px;border-radius:4px;margin-left:6px;vertical-align:middle}
-    .cpu-tag.fit{background:#34c759;color:#fff}
-    .cpu-tag.tight-tag{background:#ff9500;color:#fff}
-    .cpu-tag.small{background:#ccc;color:#555}
+    .cpu-tag.fit{background:#2e7d32;color:#fff}
+    .cpu-tag.tight-tag{background:#cc7a00;color:#fff}
+    .cpu-tag.small{background:#888;color:#fff}
 
-    /* mode tabs */
-    .mode-tab{background:#f0f0f0;color:#555}
-    .mode-tab.active{background:#007aff;color:#fff}
-
-    .disclaimer{font-size:.78em;color:#666;margin-top:16px;text-align:left;line-height:1.6}
+    .disclaimer{font-size:.8em;margin-top:20px;text-align:left;line-height:1.6}
     .disclaimer a{color:#007aff;text-decoration:none}
     .disclaimer a:hover{text-decoration:underline}
-    .disclaimer strong{color:#444}
 
     @media print{
       .btn-row,.no-print{display:none!important}
-      .card{break-inside:avoid;border:none;box-shadow:none}
+      .card,.chart-wrapper{break-inside:avoid}
       .chart-wrapper{height:260px}
     }
   </style>
@@ -136,12 +142,12 @@
   <!-- Calculation Mode Selector -->
   <div class="card">
     <h3>Calculation Mode</h3>
-    <p style="font-size:.85em;color:#666;margin:0 0 12px">Choose your starting point: either specify how many nodes you have and get CPU recommendations, or select a CPU model and find out how many nodes you need.</p>
+    <p style="font-size:.85em;margin:0 0 12px">Choose your starting point: either specify how many nodes you have and get CPU recommendations, or select a CPU model and find out how many nodes you need.</p>
 
     <!-- Mode tabs -->
-    <div style="display:flex;gap:0;margin-bottom:16px;border-radius:8px;overflow:hidden;border:1px solid #ccc">
+    <div style="display:flex;gap:0;margin-bottom:16px;border-radius:8px;overflow:hidden;border:1px solid #555">
       <button id="modeNodesBtn" class="mode-tab active" style="flex:1;padding:10px;border:none;cursor:pointer;font-weight:600;font-size:.9em;transition:background .2s">I know my Nodes - recommend CPU</button>
-      <button id="modeCpuBtn" class="mode-tab" style="flex:1;padding:10px;border:none;border-left:1px solid #ccc;cursor:pointer;font-weight:600;font-size:.9em;transition:background .2s">I know my CPU - recommend Nodes</button>
+      <button id="modeCpuBtn" class="mode-tab" style="flex:1;padding:10px;border:none;border-left:1px solid #555;cursor:pointer;font-weight:600;font-size:.9em;transition:background .2s">I know my CPU - recommend Nodes</button>
     </div>
 
     <!-- Mode A: By Nodes -->
@@ -165,7 +171,7 @@
           <select id="cpuSelect"></select>
         </div>
       </div>
-      <div id="cpuSelectInfo" style="font-size:.82em;color:#666;margin-top:6px"></div>
+      <div id="cpuSelectInfo" style="font-size:.82em;margin-top:6px"></div>
       <div class="btn-row">
         <button class="btn btn-primary" id="calcByCpuBtn">Calculate Required Nodes</button>
       </div>
@@ -183,8 +189,8 @@
   <!-- CPU Recommendations -->
   <div id="cpuRecommendSection" class="card" style="display:none">
     <h3>CPU Recommendations</h3>
-    <p style="font-size:.85em;color:#666;margin:0 0 4px">Based on the minimum cores required per socket, these are common server CPUs that could fit your workload.</p>
-    <p style="font-size:.82em;color:#cc6600;margin:0 0 10px;font-weight:600">Important: CPU availability depends on your OEM/server platform. Always confirm with your hardware vendor before purchasing. Newer generations offer better IPC and efficiency, enabling higher vCPU:core ratios.</p>
+    <p style="font-size:.85em;margin:0 0 4px">Based on the minimum cores required per socket, these are common server CPUs that could fit your workload.</p>
+    <p style="font-size:.82em;margin:0 0 10px;font-weight:600">Important: CPU availability depends on your OEM/server platform. Always confirm with your hardware vendor before purchasing. Newer generations offer better IPC and efficiency, enabling higher vCPU:core ratios.</p>
     <div id="cpuGrid" class="cpu-grid"></div>
   </div>
 
@@ -731,7 +737,7 @@
         "<meta charset='UTF-8'>" +
         "<title>Azure Local CPU Calculator - Export</title>" +
         "<style>" + styles + "</style>" +
-        "<style>body{margin:0;padding:16px;background:#fff}" +
+        "<style>body{margin:0;padding:16px}" +
         ".btn-row,.no-print{display:none!important}" +
         "@media print{.btn-row,.no-print{display:none!important}}</style>" +
         "</head><body>" + clone.outerHTML + "</body></html>"
