@@ -1,0 +1,657 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1d1d1f}
+
+    .container{max-width:900px;margin:0 auto;padding:16px}
+
+    /* ---- section cards ---- */
+    .card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:20px 24px;margin-bottom:16px}
+    .card h3{margin:0 0 16px;font-size:1.15em;color:#333;border-bottom:2px solid #007aff;padding-bottom:8px;display:inline-block}
+
+    /* ---- form grid ---- */
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px}
+    @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+    .form-group{display:flex;flex-direction:column}
+    .form-group.full{grid-column:1/-1}
+    .form-group label{font-size:.85em;font-weight:600;margin-bottom:4px;color:#555}
+    .form-group input[type=number],
+    .form-group select{padding:10px 12px;border:1px solid #ccc;border-radius:8px;font-size:.95em;background:#fafafa;transition:border-color .2s}
+    .form-group input[type=number]:focus,
+    .form-group select:focus{outline:none;border-color:#007aff;background:#fff}
+    .form-group select{appearance:auto}
+
+    /* ---- checkboxes ---- */
+    .chk-row{display:flex;align-items:center;gap:8px;padding:4px 0}
+    .chk-row input[type=checkbox]{width:18px;height:18px;accent-color:#007aff;cursor:pointer}
+    .chk-row label{font-size:.88em;font-weight:500;cursor:pointer;color:#444}
+
+    /* ---- currency selector ---- */
+    .currency-bar{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+    .currency-bar label{font-weight:600;font-size:.9em}
+    .currency-bar select{padding:6px 10px;border-radius:8px;border:1px solid #ccc;font-size:.9em}
+
+    /* ---- buttons ---- */
+    .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+    .btn{border:none;border-radius:8px;padding:12px 24px;font-size:.95em;font-weight:600;cursor:pointer;transition:background .2s}
+    .btn-primary{background:#007aff;color:#fff}
+    .btn-primary:hover{background:#005ecb}
+    .btn-secondary{background:#f0f0f0;color:#333;border:1px solid #ccc}
+    .btn-secondary:hover{background:#e0e0e0}
+
+    /* ---- results ---- */
+    .result-box{background:#f7f9fc;border:1px solid #dde4ee;border-radius:10px;padding:16px 20px;margin-top:16px;text-align:left;font-size:.92em;line-height:1.7}
+    .result-box strong{color:#333}
+
+    /* ---- charts ---- */
+    .charts-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
+    .chart-wrapper{background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px;position:relative;height:320px}
+    .chart-wrapper canvas{width:100%!important;height:100%!important}
+    @media(min-width:700px){.charts-grid.two-col{grid-template-columns:1fr 1fr}}
+
+    /* ---- overview table ---- */
+    .overview-table{width:100%;border-collapse:collapse;font-size:.88em;margin-top:12px}
+    .overview-table th,.overview-table td{padding:8px 10px;text-align:left;border-bottom:1px solid #e5e5e5}
+    .overview-table th{background:#f5f7fa;font-weight:600;color:#444}
+    .overview-table td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+    .overview-table .section-header{background:#eaf0fb;font-weight:700;color:#007aff;font-size:.92em}
+    .overview-table .total-row{font-weight:700;background:#f0f4ff}
+    .overview-table .formula{color:#888;font-size:.82em}
+
+    /* ---- disclaimer ---- */
+    .disclaimer{font-size:.78em;color:#666;margin-top:16px;text-align:left;line-height:1.6}
+    .disclaimer a{color:#007aff;text-decoration:none}
+    .disclaimer a:hover{text-decoration:underline}
+    .disclaimer strong{color:#444}
+
+    /* ---- print-friendly ---- */
+    @media print{
+      .btn-row,.no-print{display:none!important}
+      .card{break-inside:avoid;border:none;box-shadow:none}
+      .chart-wrapper{height:260px}
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="calcRoot">
+
+  <!-- Currency -->
+  <div class="currency-bar">
+    <label for="currencySelect">Currency:</label>
+    <select id="currencySelect">
+      <option value="EUR" selected>EUR</option>
+      <option value="USD">USD</option>
+      <option value="GBP">GBP</option>
+      <option value="CHF">CHF</option>
+    </select>
+  </div>
+
+  <!-- Section 1: Infrastructure -->
+  <div class="card">
+    <h3>Infrastructure Price</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="nodes">Number of Nodes</label>
+        <input type="number" id="nodes" value="1" min="1" max="16" step="1">
+      </div>
+      <div class="form-group">
+        <label for="pricePerNode">Price per Node</label>
+        <input type="number" id="pricePerNode" value="50000" min="0" step="100">
+      </div>
+      <div class="form-group">
+        <label for="switches">Number of Switches</label>
+        <input type="number" id="switches" value="0" min="0" max="8" step="1">
+      </div>
+      <div class="form-group">
+        <label for="pricePerSwitch">Price per Switch</label>
+        <input type="number" id="pricePerSwitch" value="20000" min="0" step="100">
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Licensing -->
+  <div class="card">
+    <h3>License Price</h3>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label for="coresPerNode">Physical Cores per Node</label>
+        <input type="number" id="coresPerNode" value="16" min="1" max="128" step="1">
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <div class="chk-row">
+        <input type="checkbox" id="waiveHostFee">
+        <label for="waiveHostFee">Waive Azure Local Host Fee (saves 10/core/month)</label>
+      </div>
+      <div class="chk-row">
+        <input type="checkbox" id="waiveWindowsLicense">
+        <label for="waiveWindowsLicense">Waive Windows Server License Fee (saves 23.30/core/month)</label>
+      </div>
+      <div class="chk-row">
+        <input type="checkbox" id="customLicenseChk">
+        <label for="customLicenseChk">Use Custom Windows License Pricing (per Node)</label>
+      </div>
+    </div>
+    <div id="customLicenseContainer" style="display:none;margin-top:12px">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="customWinMonthly">Windows Datacenter License (monthly/node)</label>
+          <input type="number" id="customWinMonthly" placeholder="e.g., 500" step="0.1" min="0">
+        </div>
+        <div class="form-group">
+          <label for="customWinOneTime">One-Time Datacenter License (per node)</label>
+          <input type="number" id="customWinOneTime" placeholder="e.g., 3000" step="100" min="0">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Related Costs (broken down) -->
+  <div class="card">
+    <h3>Related Licenses / Costs</h3>
+    <p style="font-size:.82em;color:#777;margin:0 0 12px">Enter the relevant costs for each category. Leave blank or 0 for items that do not apply.</p>
+
+    <!-- Backup -->
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9em;font-weight:700;color:#007aff;display:block;margin-bottom:6px">Backup</label>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="backupOTC">One-Time Cost (OTC)</label>
+          <input type="number" id="backupOTC" placeholder="e.g., 5000" step="100" min="0">
+        </div>
+        <div class="form-group">
+          <label for="backupMonthly">Monthly Cost</label>
+          <input type="number" id="backupMonthly" placeholder="e.g., 200" step="10" min="0">
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs / Monitoring -->
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9em;font-weight:700;color:#007aff;display:block;margin-bottom:6px">Logs / Monitoring</label>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="logsOTC">One-Time Cost (OTC)</label>
+          <input type="number" id="logsOTC" placeholder="e.g., 2000" step="100" min="0">
+        </div>
+        <div class="form-group">
+          <label for="logsMonthly">Monthly Cost</label>
+          <input type="number" id="logsMonthly" placeholder="e.g., 150" step="10" min="0">
+        </div>
+      </div>
+    </div>
+
+    <!-- Installation -->
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9em;font-weight:700;color:#007aff;display:block;margin-bottom:6px">Installation</label>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="installOTC">One-Time Cost (OTC)</label>
+          <input type="number" id="installOTC" placeholder="e.g., 10000" step="100" min="0">
+        </div>
+        <div class="form-group">
+          <label for="installMonthly">Monthly Cost</label>
+          <input type="number" id="installMonthly" placeholder="e.g., 0" step="10" min="0">
+        </div>
+      </div>
+    </div>
+
+    <!-- External Partner Management -->
+    <div style="margin-bottom:14px">
+      <label style="font-size:.9em;font-weight:700;color:#007aff;display:block;margin-bottom:6px">External Partner Management</label>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="partnerOTC">One-Time Cost (OTC)</label>
+          <input type="number" id="partnerOTC" placeholder="e.g., 3000" step="100" min="0">
+        </div>
+        <div class="form-group">
+          <label for="partnerMonthly">Monthly Cost</label>
+          <input type="number" id="partnerMonthly" placeholder="e.g., 500" step="10" min="0">
+        </div>
+      </div>
+    </div>
+
+    <!-- Other -->
+    <div>
+      <label style="font-size:.9em;font-weight:700;color:#007aff;display:block;margin-bottom:6px">Other</label>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="otherOTC">One-Time Cost (OTC)</label>
+          <input type="number" id="otherOTC" placeholder="e.g., 1000" step="100" min="0">
+        </div>
+        <div class="form-group">
+          <label for="otherMonthly">Monthly Cost</label>
+          <input type="number" id="otherMonthly" placeholder="e.g., 100" step="10" min="0">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: Azure Services -->
+  <div class="card">
+    <h3>Azure Local Services Price</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="avdVCPUs">AVD vCPUs</label>
+        <input type="number" id="avdVCPUs" placeholder="e.g., 32" step="1" min="0">
+      </div>
+      <div class="form-group">
+        <label for="avdHours">AVD Usage Hours / Month</label>
+        <input type="number" id="avdHours" value="280" min="1" max="730" step="1">
+      </div>
+      <div class="form-group">
+        <label for="sqlVcores">SQL Managed Instance vCores</label>
+        <input type="number" id="sqlVcores" placeholder="e.g., 4" step="1" min="0">
+      </div>
+      <div class="form-group">
+        <label for="sqlHours">SQLmi Usage Hours / Month</label>
+        <input type="number" id="sqlHours" value="730" min="1" max="730" step="1">
+      </div>
+      <div class="form-group">
+        <label for="sqlTier">SQLmi Tier</label>
+        <select id="sqlTier">
+          <option value="General Purpose">General Purpose</option>
+          <option value="Business Critical">Business Critical</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="sqlLicensing">SQLmi Licensing Model</label>
+        <select id="sqlLicensing">
+          <option value="License Included">License Included</option>
+          <option value="Azure Hybrid Benefit">Azure Hybrid Benefit</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label for="sqlTerm">Reservation Term</label>
+        <select id="sqlTerm">
+          <option value="PAYG">PAYG</option>
+          <option value="1 Year RI">1 Year RI</option>
+          <option value="3 Year RI">3 Year RI</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="btn-row">
+    <button class="btn btn-primary" id="calcBtn">Calculate Pricing</button>
+    <button class="btn btn-secondary" id="exportPdfBtn" style="display:none">Export to PDF</button>
+  </div>
+
+  <!-- Results -->
+  <div id="resultBox" class="result-box" style="display:none"></div>
+
+  <!-- Charts -->
+  <div id="chartsSection" style="display:none">
+    <div class="charts-grid">
+      <div class="chart-wrapper"><canvas id="costChart"></canvas></div>
+    </div>
+    <div class="charts-grid two-col">
+      <div class="chart-wrapper"><canvas id="oneTimeBreakdownChart"></canvas></div>
+      <div class="chart-wrapper"><canvas id="costBreakdownChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Overview -->
+  <div id="overviewSection" class="card" style="display:none">
+    <h3>Full Overview</h3>
+    <table class="overview-table" id="overviewTable"></table>
+  </div>
+
+  <!-- Disclaimers -->
+  <div class="disclaimer">
+    <p>
+      <strong>Disclaimer for Pricing Calculator:</strong><br>
+      This <em>Pricing Calculator</em> is provided for informational purposes only and includes:
+    </p>
+    <ul>
+      <li><strong>Infrastructure Price:</strong> Node and switch costs (one-time).</li>
+      <li><strong>License Price:</strong> Host fee (10/core), Windows Server fee (23.30/core) - or custom pricing: monthly + one-time cost per node.</li>
+      <li><strong>Related Costs:</strong> Additional one-time and monthly costs for external services (e.g., Backup, security software).</li>
+      <li><strong>Service Price:</strong> Azure Virtual Desktop (AVD) and SQL Managed Instance (SQLmi) usage costs (monthly).</li>
+    </ul>
+    <p>Actual costs may vary depending on vendor quotes, hardware configurations, and licensing agreements.</p>
+    <p>
+      <strong>Hybrid Benefit Disclaimer:</strong><br>
+      The Azure Local Host fee (10/core) and Windows Server fee (23.30/core) can be waived if you qualify for Azure Hybrid Benefit under an Enterprise Agreement (EA) or a Cloud Solution Provider (CSP) subscription. MPSA or OEM + SA is not supported, and Hybrid Benefit is not defined for Open Value. Consult the
+      <a href="https://www.microsoft.com/licensing/terms/productoffering/MicrosoftAzure/EAEAS" target="_blank">Microsoft Product Terms (EA/CSP)</a>,
+      <a href="https://www.microsoft.com/licensing/terms/productoffering/WindowsServerStandardDatacenterEssentials/SS" target="_blank">Microsoft Product Terms for Windows Server</a>, and
+      <a href="https://learn.microsoft.com/en-us/windows-server/get-started/azure-hybrid-benefit?tabs=azure-local#getting-azure-hybrid-benefit" target="_blank">Azure Hybrid Benefit for Windows Server</a>
+      for specifics. Product Terms override general documentation.
+    </p>
+    <p>
+      <strong>Windows Server License Disclaimer:</strong><br>
+      By default, a Windows Server guest fee of 23.30/core/month is applied unless waived or supplemented by custom pricing. Confirm eligibility and final costs with your licensing provider.
+    </p>
+    <p>
+      <strong>Related Costs Disclaimer:</strong><br>
+      The Related Licenses / Costs section is broken down into Backup, Logs/Monitoring, Installation, External Partner Management, and Other. Each category supports both one-time (OTC) and monthly costs. These values are illustrative; actual costs depend on vendor quotes and service agreements.
+    </p>
+    <p>
+      <strong>AVD and SQLmi Disclaimer:</strong><br>
+      AVD costs are estimated at 0.01 per vCPU per hour. SQLmi pricing depends on tier, licensing model, and reservation term. These calculations are illustrative. For more info visit
+      <a href="https://azure.microsoft.com/en-us/pricing/details/azure-arc/data-services/" target="_blank">Azure Arc Data Services Pricing</a>.
+      Always refer to official Microsoft documentation for up-to-date pricing.
+    </p>
+    <p>
+      <strong>No Warranty:</strong><br>
+      All information is provided "as is" with no warranties, express or implied. It does not represent official Microsoft documentation. Verify your specific agreements, product terms, and quotes for accurate pricing.
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+
+  /* ---- currency ---- */
+  const currencySymbols = { EUR: "\u20ac", USD: "$", GBP: "\u00a3", CHF: "CHF " };
+  function sym() { return currencySymbols[$("currencySelect").value] || ""; }
+  function fmt(n) { return sym() + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  /* ---- checkbox linking ---- */
+  $("customLicenseChk").addEventListener("change", function () {
+    $("waiveWindowsLicense").checked = this.checked;
+    $("customLicenseContainer").style.display = this.checked ? "block" : "none";
+  });
+  $("waiveWindowsLicense").addEventListener("change", function () {
+    $("customLicenseChk").checked = this.checked;
+    $("customLicenseContainer").style.display = this.checked ? "block" : "none";
+  });
+
+  /* ---- SQL price lookup (per vCore / month) ---- */
+  const sqlPrices = {
+    "General Purpose": {
+      "License Included":     { "PAYG": 116.73, "1 Year RI": 107.55, "3 Year RI": 88.52 },
+      "Azure Hybrid Benefit": { "PAYG": 47.25,  "1 Year RI": 38.07,  "3 Year RI": 19.04 }
+    },
+    "Business Critical": {
+      "License Included":     { "PAYG": 355.74, "1 Year RI": 336.70, "3 Year RI": 298.63 },
+      "Azure Hybrid Benefit": { "PAYG": 95.19,  "1 Year RI": 76.15,  "3 Year RI": 38.07 }
+    }
+  };
+
+  /* ---- chart instances ---- */
+  let costChart = null, oneTimeBreakdownChart = null, costBreakdownChart = null;
+
+  const num = el => +(el.value) || 0;
+
+  /* ================================================================
+     MAIN CALCULATION
+     ================================================================ */
+  function calculate() {
+    const nodes      = num($("nodes"));
+    const nodeUnit   = num($("pricePerNode"));
+    const switches   = num($("switches"));
+    const switchUnit = num($("pricePerSwitch"));
+    const nodesCost  = nodes * nodeUnit;
+    const switchCost = switches * switchUnit;
+    const hwCost     = nodesCost + switchCost;
+
+    const coresPerNode = num($("coresPerNode"));
+    const totalCores   = nodes * coresPerNode;
+    const hostFee      = $("waiveHostFee").checked ? 0 : totalCores * 10;
+
+    let winMonthly = 0, winOneTime = 0;
+    if ($("customLicenseChk").checked) {
+      winMonthly = num($("customWinMonthly")) * nodes;
+      winOneTime = num($("customWinOneTime"))  * nodes;
+    } else if (!$("waiveWindowsLicense").checked) {
+      winMonthly = totalCores * 23.30;
+    }
+
+    /* related costs (broken down) */
+    const backupOTC    = num($("backupOTC"));
+    const backupMonth  = num($("backupMonthly"));
+    const logsOTC      = num($("logsOTC"));
+    const logsMonth    = num($("logsMonthly"));
+    const installOTC   = num($("installOTC"));
+    const installMonth = num($("installMonthly"));
+    const partnerOTC   = num($("partnerOTC"));
+    const partnerMonth = num($("partnerMonthly"));
+    const otherOTC     = num($("otherOTC"));
+    const otherMonth   = num($("otherMonthly"));
+
+    const thirdOneTime = backupOTC + logsOTC + installOTC + partnerOTC + otherOTC;
+    const thirdMonthly = backupMonth + logsMonth + installMonth + partnerMonth + otherMonth;
+
+    const avdVCPUs = num($("avdVCPUs"));
+    const avdHours = num($("avdHours"));
+    const avdCost  = avdVCPUs * 0.01 * avdHours;
+
+    const sqlVcores = num($("sqlVcores"));
+    const sqlHours  = num($("sqlHours"));
+    const sqlTier   = $("sqlTier").value;
+    const sqlLic    = $("sqlLicensing").value;
+    const sqlTerm   = $("sqlTerm").value;
+    const sqlMonthlyRate = sqlPrices[sqlTier][sqlLic][sqlTerm];
+    const sqlHourlyRate  = sqlMonthlyRate / 730;
+    const sqlCost        = sqlVcores * sqlHourlyRate * sqlHours;
+
+    const oneTimeTotal = hwCost + winOneTime + thirdOneTime;
+    const monthlyTotal = hostFee + winMonthly + thirdMonthly + avdCost + sqlCost;
+    const yearlyTotal  = oneTimeTotal + monthlyTotal * 12;
+    const threeYearTotal = oneTimeTotal + monthlyTotal * 36;
+
+    /* ---- quick result ---- */
+    const rb = $("resultBox");
+    rb.style.display = "block";
+    rb.innerHTML =
+      "<strong>Total One-Time Cost:</strong> " + fmt(oneTimeTotal) + "<br>" +
+      "<strong>Total Monthly Cost:</strong> " + fmt(monthlyTotal) + "<br>" +
+      "<strong>Estimated 1-Year Total:</strong> " + fmt(yearlyTotal) + "<br>" +
+      "<strong>Estimated 3-Year Total:</strong> " + fmt(threeYearTotal);
+
+    /* ---- charts ---- */
+    $("chartsSection").style.display = "block";
+    drawTotalChart(oneTimeTotal, monthlyTotal, yearlyTotal);
+    drawOneTimeChart(nodesCost, switchCost, winOneTime, thirdOneTime);
+    drawMonthlyChart(hostFee, winMonthly, avdCost, sqlCost, thirdMonthly);
+
+    /* ---- overview ---- */
+    buildOverview({
+      nodes, nodeUnit, nodesCost,
+      switches, switchUnit, switchCost, hwCost,
+      coresPerNode, totalCores,
+      hostFeeWaived: $("waiveHostFee").checked,
+      hostFee,
+      winLicenseMode: $("customLicenseChk").checked ? "custom" : ($("waiveWindowsLicense").checked ? "waived" : "default"),
+      winMonthly, winOneTime,
+      backupOTC, backupMonth, logsOTC, logsMonth,
+      installOTC, installMonth, partnerOTC, partnerMonth,
+      otherOTC, otherMonth, thirdOneTime, thirdMonthly,
+      avdVCPUs, avdHours, avdCost,
+      sqlVcores, sqlHours, sqlTier, sqlLic, sqlTerm, sqlMonthlyRate, sqlHourlyRate, sqlCost,
+      oneTimeTotal, monthlyTotal, yearlyTotal, threeYearTotal
+    });
+
+    $("exportPdfBtn").style.display = "inline-block";
+  }
+
+  /* ================================================================
+     OVERVIEW TABLE
+     ================================================================ */
+  function buildOverview(d) {
+    $("overviewSection").style.display = "block";
+    const c = sym();
+    const rows = [];
+
+    function sec(title) { rows.push('<tr class="section-header"><td colspan="3">' + title + "</td></tr>"); }
+    function row(label, formula, value) {
+      rows.push("<tr><td>" + label + '</td><td class="formula">' + formula + "</td><td>" + value + "</td></tr>");
+    }
+    function total(label, value) {
+      rows.push('<tr class="total-row"><td colspan="2">' + label + "</td><td>" + value + "</td></tr>");
+    }
+
+    rows.push("<thead><tr><th>Item</th><th>Calculation</th><th>Amount</th></tr></thead><tbody>");
+
+    sec("Infrastructure (One-Time)");
+    row("Nodes Cost", d.nodes + " nodes x " + fmt(d.nodeUnit) + "/node", fmt(d.nodesCost));
+    row("Switches Cost", d.switches + " switches x " + fmt(d.switchUnit) + "/switch", fmt(d.switchCost));
+    total("Total Hardware", fmt(d.hwCost));
+
+    sec("Licensing");
+    row("Total Physical Cores", d.nodes + " nodes x " + d.coresPerNode + " cores/node", d.totalCores + " cores");
+    row("Azure Local Host Fee (monthly)", d.hostFeeWaived ? "Waived" : d.totalCores + " cores x " + c + "10/core", fmt(d.hostFee));
+
+    if (d.winLicenseMode === "custom") {
+      row("Windows License (monthly)", "Custom: " + fmt(d.winMonthly / d.nodes) + "/node x " + d.nodes + " nodes", fmt(d.winMonthly));
+      row("Windows License (one-time)", "Custom: " + fmt(d.winOneTime / d.nodes) + "/node x " + d.nodes + " nodes", fmt(d.winOneTime));
+    } else if (d.winLicenseMode === "waived") {
+      row("Windows License (monthly)", "Waived", fmt(0));
+    } else {
+      row("Windows License (monthly)", d.totalCores + " cores x " + c + "23.30/core", fmt(d.winMonthly));
+    }
+
+    sec("Related / Third-Party");
+    if (d.backupOTC || d.backupMonth)   { row("Backup (OTC)", "User-defined", fmt(d.backupOTC));   row("Backup (monthly)", "User-defined", fmt(d.backupMonth)); }
+    if (d.logsOTC || d.logsMonth)       { row("Logs / Monitoring (OTC)", "User-defined", fmt(d.logsOTC));     row("Logs / Monitoring (monthly)", "User-defined", fmt(d.logsMonth)); }
+    if (d.installOTC || d.installMonth) { row("Installation (OTC)", "User-defined", fmt(d.installOTC)); row("Installation (monthly)", "User-defined", fmt(d.installMonth)); }
+    if (d.partnerOTC || d.partnerMonth) { row("External Partner Mgmt (OTC)", "User-defined", fmt(d.partnerOTC)); row("External Partner Mgmt (monthly)", "User-defined", fmt(d.partnerMonth)); }
+    if (d.otherOTC || d.otherMonth)     { row("Other (OTC)", "User-defined", fmt(d.otherOTC));     row("Other (monthly)", "User-defined", fmt(d.otherMonth)); }
+    total("Related Total (OTC)", fmt(d.thirdOneTime));
+    total("Related Total (monthly)", fmt(d.thirdMonthly));
+
+    sec("Azure Services (Monthly)");
+    row("AVD Cost", d.avdVCPUs + " vCPUs x " + c + "0.01/vCPU/hr x " + d.avdHours + " hrs", fmt(d.avdCost));
+    row("SQLmi Rate", d.sqlTier + " / " + d.sqlLic + " / " + d.sqlTerm, fmt(d.sqlMonthlyRate) + "/vCore/month");
+    row("SQLmi Cost", d.sqlVcores + " vCores x " + c + d.sqlHourlyRate.toFixed(4) + "/hr x " + d.sqlHours + " hrs", fmt(d.sqlCost));
+
+    sec("Totals");
+    total("Total One-Time Cost", fmt(d.oneTimeTotal));
+    total("Total Monthly Cost", fmt(d.monthlyTotal));
+    total("Estimated 1-Year Total", fmt(d.yearlyTotal));
+    total("Estimated 3-Year Total", fmt(d.threeYearTotal));
+
+    rows.push("</tbody>");
+    $("overviewTable").innerHTML = rows.join("");
+  }
+
+  /* ================================================================
+     CHARTS
+     ================================================================ */
+  const chartOpts = (title, yLabel) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { title: { display: true, text: title, font: { size: 14 } }, legend: { display: false } },
+    scales: { y: { beginAtZero: true, title: { display: true, text: yLabel } } }
+  });
+
+  function addDS(list, label, vals, color, stack) {
+    if (vals.some(v => v > 0)) list.push({ label, data: vals, backgroundColor: color, stack });
+  }
+  function filterCategories(labels, datasets) {
+    const keep = labels.map((_, i) => datasets.some(ds => ds.data[i] > 0));
+    return {
+      labels: labels.filter((_, i) => keep[i]),
+      datasets: datasets.map(ds => ({ ...ds, data: ds.data.filter((_, i) => keep[i]) })).filter(ds => ds.data.some(v => v > 0))
+    };
+  }
+
+  function drawTotalChart(oneT, monthT, yearT) {
+    const cur = $("currencySelect").value;
+    const cfg = {
+      type: "bar",
+      data: { labels: ["One-Time", "Monthly", "1-Year Est."], datasets: [{ data: [oneT, monthT, yearT], backgroundColor: ["rgba(0,122,255,.75)", "rgba(88,86,214,.75)", "rgba(52,199,89,.75)"] }] },
+      options: chartOpts("Cost Summary", cur)
+    };
+    if (costChart) costChart.destroy();
+    costChart = new Chart($("costChart").getContext("2d"), cfg);
+  }
+
+  function drawOneTimeChart(nodesCost, switchCost, winOneTime, thirdOneTime) {
+    const cur = $("currencySelect").value;
+    const base = ["Hardware", "Windows License", "Third-Party"];
+    const raw = [];
+    addDS(raw, "Nodes",       [nodesCost,  0,          0],           "rgba(0,122,255,.75)", "HW");
+    addDS(raw, "Switches",    [switchCost, 0,          0],           "rgba(90,200,250,.75)","HW");
+    addDS(raw, "Windows Lic.",[0,          winOneTime, 0],           "rgba(88,86,214,.75)", "WIN");
+    addDS(raw, "Third-Party", [0,          0,          thirdOneTime],"rgba(175,175,175,.75)","3P");
+    const { labels, datasets } = filterCategories(base, raw);
+    const cfg = {
+      type: "bar", data: { labels, datasets },
+      options: { ...chartOpts("One-Time Breakdown", cur), plugins: { ...chartOpts("One-Time Breakdown", cur).plugins, legend: { position: "bottom", labels: { boxWidth: 12 } } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: cur } } } }
+    };
+    if (oneTimeBreakdownChart) oneTimeBreakdownChart.destroy();
+    oneTimeBreakdownChart = new Chart($("oneTimeBreakdownChart").getContext("2d"), cfg);
+  }
+
+  function drawMonthlyChart(host, win, avd, sql, third) {
+    const cur = $("currencySelect").value;
+    const base = ["Licensing", "AVD", "SQLmi", "Third-Party"];
+    const raw = [];
+    addDS(raw, "Host Fee",    [host, 0,   0,   0],    "rgba(0,122,255,.75)",  "LIC");
+    addDS(raw, "Windows Lic.",[win,  0,   0,   0],    "rgba(90,200,250,.75)", "LIC");
+    addDS(raw, "AVD",         [0,    avd, 0,   0],    "rgba(88,86,214,.75)",  "AVD");
+    addDS(raw, "SQLmi",       [0,    0,   sql, 0],    "rgba(52,199,89,.75)",  "SQL");
+    addDS(raw, "Third-Party", [0,    0,   0,   third],"rgba(175,175,175,.75)","3P");
+    const { labels, datasets } = filterCategories(base, raw);
+    const cfg = {
+      type: "bar", data: { labels, datasets },
+      options: { ...chartOpts("Monthly Breakdown", cur), plugins: { ...chartOpts("Monthly Breakdown", cur).plugins, legend: { position: "bottom", labels: { boxWidth: 12 } } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: cur } } } }
+    };
+    if (costBreakdownChart) costBreakdownChart.destroy();
+    costBreakdownChart = new Chart($("costBreakdownChart").getContext("2d"), cfg);
+  }
+
+  /* ================================================================
+     PDF EXPORT
+     ================================================================ */
+  async function exportPdf() {
+    const btn = $("exportPdfBtn");
+    btn.textContent = "Generating PDF...";
+    btn.disabled = true;
+
+    try {
+      const root = $("calcRoot");
+      const canvas = await html2canvas(root, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+      const imgData = canvas.toDataURL("image/png");
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const usableW = pageW - margin * 2;
+      const imgH = (canvas.height * usableW) / canvas.width;
+
+      let y = margin;
+      let remaining = imgH;
+      const usableH = pageH - margin * 2;
+
+      /* slice the image across pages */
+      while (remaining > 0) {
+        const sliceH = Math.min(remaining, usableH);
+        const sourceY = imgH - remaining;
+        pdf.addImage(imgData, "PNG", margin, y - sourceY, usableW, imgH);
+        remaining -= usableH;
+        if (remaining > 0) { pdf.addPage(); y = margin; }
+      }
+
+      pdf.save("AzureLocal-PricingEstimate.pdf");
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      alert("PDF export failed. You can also use your browser's Print to PDF (Ctrl+P) as a fallback.");
+    }
+
+    btn.textContent = "Export to PDF";
+    btn.disabled = false;
+  }
+
+  /* ---- events ---- */
+  $("calcBtn").addEventListener("click", calculate);
+  $("exportPdfBtn").addEventListener("click", exportPdf);
+})();
+</script>
+</body>
+</html>

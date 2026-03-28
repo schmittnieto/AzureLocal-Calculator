@@ -1,0 +1,338 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+    .container{margin:20px 0;text-align:center}
+    h3{font-size:1.5em;margin-bottom:20px}
+    .slider-container{margin:20px 0;text-align:left}
+    .checkbox-container{display:flex;align-items:center;margin-bottom:10px}
+    .checkbox-container input{margin-right:8px;transform:scale(1.2)}
+    label{display:block;margin-bottom:5px;font-weight:600}
+    input[type=range]{width:100%;margin:10px 0}
+    input[type=number],select{width:100%;padding:8px;border:1px solid #555;border-radius:8px;box-sizing:border-box;margin-top:5px}
+    select{background:#444;color:#fff}
+    button{background:#007aff;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:1em;cursor:pointer;margin-top:20px}
+    button:hover{background:#005bb5}
+    #result_cpu{margin-top:20px;text-align:left;font-size:.95em}
+    .chart-container{margin-top:20px;text-align:center;width:auto}
+    canvas{background:#fff;border-radius:8px}
+    .disclaimer{font-size:.8em;margin-top:20px;text-align:left}
+    .disclaimer a{color:#007aff;text-decoration:none}
+    .disclaimer a:hover{text-decoration:underline}
+    .warning{color:#cc3300;font-weight:600}
+    .ok{color:#2e7d32;font-weight:600}
+    table{width:100%;border-collapse:collapse;margin-top:15px;text-align:left;font-size:.9em}
+    th,td{padding:8px 10px;border-bottom:1px solid #ddd}
+    th{font-weight:600;background:#f5f5f5}
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- INPUTS: Workload Definition -->
+  <h3>Virtual Workloads</h3>
+  <div class="slider-container">
+    <label for="vmCount">Number of Virtual Machines (<span id="vmCountValue">10</span>)</label>
+    <input type="range" id="vmCount" min="1" max="500" value="10">
+  </div>
+  <div class="slider-container">
+    <label for="vcpusPerVm">Average vCPUs per VM (<span id="vcpusPerVmValue">4</span>)</label>
+    <input type="range" id="vcpusPerVm" min="1" max="64" value="4">
+  </div>
+
+  <!-- INPUTS: Overcommit and Overhead -->
+  <h3>CPU Ratio and Overhead</h3>
+  <div class="slider-container">
+    <label for="overcommitRatio">vCPU to Physical Core Ratio (<span id="overcommitRatioValue">4</span>:1)</label>
+    <input type="range" id="overcommitRatio" min="1" max="16" value="4" step="1">
+  </div>
+  <div class="slider-container">
+    <label for="mgmtOverhead">Management Overhead per Node (cores) (<span id="mgmtOverheadValue">4</span>)</label>
+    <input type="range" id="mgmtOverhead" min="0" max="16" value="4" step="1">
+  </div>
+
+  <!-- INPUTS: Cluster Configuration -->
+  <h3>Cluster Configuration</h3>
+  <div class="slider-container">
+    <label for="nodeCount">Number of Nodes (<span id="nodeCountValue">2</span>)</label>
+    <input type="range" id="nodeCount" min="1" max="16" value="2">
+  </div>
+  <div class="checkbox-container">
+    <input type="checkbox" id="haEnabled" checked>
+    <label for="haEnabled">Reserve capacity for N+1 High Availability (one node failover)</label>
+  </div>
+  <div class="slider-container">
+    <label for="coresPerSocket">Cores per CPU Socket (<span id="coresPerSocketValue">16</span>)</label>
+    <input type="range" id="coresPerSocket" min="4" max="128" value="16" step="2">
+  </div>
+  <div class="slider-container">
+    <label for="socketsPerNode">CPU Sockets per Node (<span id="socketsPerNodeValue">2</span>)</label>
+    <input type="range" id="socketsPerNode" min="1" max="4" value="2" step="1">
+  </div>
+
+  <button id="calcBtn">Calculate CPU Requirements</button>
+
+  <!-- OUTPUT -->
+  <div id="result_cpu"></div>
+  <div class="chart-container"><canvas id="coreChart"></canvas></div>
+  <div class="chart-container"><canvas id="nodeChart"></canvas></div>
+
+  <!-- Disclaimers -->
+  <div class="disclaimer">
+    <p>
+      <strong>vCPU to Physical Core Ratio Disclaimer:</strong><br>
+      The vCPU to physical core ratio (overcommit ratio) determines how many virtual CPUs share a single physical core. A ratio of 1:1 means no overcommit (dedicated cores). Common ratios range from 2:1 to 8:1 depending on workload type. VDI workloads typically use 4:1 to 8:1, while database or latency-sensitive workloads should stay closer to 1:1 or 2:1. Higher ratios reduce hardware cost but may impact performance under load.
+    </p>
+    <p>
+      <strong>Management Overhead Disclaimer:</strong><br>
+      Each Azure Local node reserves CPU cores for the host OS, Azure Arc agents, Storage Spaces Direct, and cluster services. The default of 4 cores is a reasonable estimate, but actual overhead may vary based on enabled features (e.g., AKS-HCI, ARC Resource Bridge). Consult
+      <a href="https://learn.microsoft.com/en-us/azure/azure-local/concepts/host-network-requirements" target="_blank">Azure Local system requirements</a>
+      for specifics.
+    </p>
+    <p>
+      <strong>High Availability (N+1) Disclaimer:</strong><br>
+      When N+1 HA is enabled, the calculator reserves one full node worth of capacity so workloads can failover if a single node goes down. This is the standard recommendation for production clusters. If your cluster has only 1 node, HA reservation is automatically disabled.
+    </p>
+    <p>
+      <strong>Socket and Core Sizing Disclaimer:</strong><br>
+      The cores per socket and sockets per node values should match the server hardware you plan to use. The total physical cores per node equals (Cores per Socket) x (Sockets per Node). Windows Server Datacenter licensing is typically sold per 2-core pack with a minimum of 16 cores per node.
+    </p>
+    <p>
+      <strong>No Warranty:</strong><br>
+      All information in this CPU Calculator is provided "as is" with no warranties, express or implied. It does not represent official Microsoft documentation. Always verify with your hardware vendor and Microsoft licensing team for accurate sizing and configuration.
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+
+  /* ---- slider label sync ---- */
+  const sliders = {
+    vmCount:        "vmCountValue",
+    vcpusPerVm:     "vcpusPerVmValue",
+    overcommitRatio:"overcommitRatioValue",
+    mgmtOverhead:   "mgmtOverheadValue",
+    nodeCount:      "nodeCountValue",
+    coresPerSocket: "coresPerSocketValue",
+    socketsPerNode: "socketsPerNodeValue"
+  };
+
+  for (const [sliderId, spanId] of Object.entries(sliders)) {
+    $(sliderId).addEventListener("input", function () {
+      $(spanId).textContent = this.value;
+    });
+  }
+
+  /* ---- chart instances ---- */
+  let coreChart = null;
+  let nodeChart = null;
+
+  /* ---- helpers ---- */
+  const num = el => +el.value || 0;
+
+  /* ---- main calculation ---- */
+  function calculate() {
+    const vms             = num($("vmCount"));
+    const vcpusPerVm      = num($("vcpusPerVm"));
+    const overcommit      = num($("overcommitRatio"));
+    const mgmtPerNode     = num($("mgmtOverhead"));
+    const nodes           = num($("nodeCount"));
+    const haEnabled       = $("haEnabled").checked && nodes > 1;
+    const coresPerSocket  = num($("coresPerSocket"));
+    const socketsPerNode  = num($("socketsPerNode"));
+
+    /* total vCPUs needed */
+    const totalVCPUs = vms * vcpusPerVm;
+
+    /* physical cores needed for workloads (before overhead) */
+    const workloadCores = Math.ceil(totalVCPUs / overcommit);
+
+    /* available nodes for workloads (considering HA) */
+    const workloadNodes = haEnabled ? nodes - 1 : nodes;
+
+    /* physical cores per node from hardware config */
+    const physicalCoresPerNode = coresPerSocket * socketsPerNode;
+
+    /* available cores per node after management overhead */
+    const availableCoresPerNode = Math.max(physicalCoresPerNode - mgmtPerNode, 0);
+
+    /* total available cores in the cluster for workloads */
+    const totalAvailableCores = availableCoresPerNode * workloadNodes;
+
+    /* total management cores across cluster */
+    const totalMgmtCores = mgmtPerNode * nodes;
+
+    /* total physical cores in cluster */
+    const totalPhysicalCores = physicalCoresPerNode * nodes;
+
+    /* HA reserved cores (one full node) */
+    const haCores = haEnabled ? physicalCoresPerNode : 0;
+
+    /* utilization percentage */
+    const utilization = totalAvailableCores > 0
+      ? Math.min((workloadCores / totalAvailableCores) * 100, 999)
+      : 0;
+
+    /* max vCPUs the cluster can support */
+    const maxVCPUs = totalAvailableCores * overcommit;
+
+    /* minimum nodes needed to fit the workload cores */
+    const minNodesForWorkload = availableCoresPerNode > 0
+      ? Math.ceil(workloadCores / availableCoresPerNode)
+      : 999;
+    const minNodesTotal = haEnabled
+      ? minNodesForWorkload + 1
+      : minNodesForWorkload;
+
+    /* status */
+    const fits = workloadCores <= totalAvailableCores;
+
+    /* ---- text output ---- */
+    let html = "<h3>Results</h3><table>";
+    html += "<tr><th colspan='2'>Workload Requirements</th></tr>";
+    html += "<tr><td>Total vCPUs Required</td><td>" + totalVCPUs + " vCPUs</td></tr>";
+    html += "<tr><td>Physical Cores Required (at " + overcommit + ":1 ratio)</td><td>" + workloadCores + " cores</td></tr>";
+
+    html += "<tr><th colspan='2'>Cluster Capacity</th></tr>";
+    html += "<tr><td>Physical Cores per Node</td><td>" + physicalCoresPerNode + " cores (" + socketsPerNode + " socket(s) x " + coresPerSocket + " cores)</td></tr>";
+    html += "<tr><td>Management Overhead per Node</td><td>" + mgmtPerNode + " cores</td></tr>";
+    html += "<tr><td>Available Cores per Node (for VMs)</td><td>" + availableCoresPerNode + " cores</td></tr>";
+    html += "<tr><td>Nodes for Workloads" + (haEnabled ? " (N+1 HA: 1 node reserved)" : "") + "</td><td>" + workloadNodes + " of " + nodes + " nodes</td></tr>";
+    html += "<tr><td>Total Available Cores for VMs</td><td>" + totalAvailableCores + " cores</td></tr>";
+    html += "<tr><td>Max vCPUs Supported (at " + overcommit + ":1)</td><td>" + maxVCPUs + " vCPUs</td></tr>";
+
+    html += "<tr><th colspan='2'>Assessment</th></tr>";
+    html += "<tr><td>Core Utilization</td><td>" + utilization.toFixed(1) + "%</td></tr>";
+
+    if (fits) {
+      html += "<tr><td>Status</td><td class='ok'>The cluster has sufficient CPU capacity.</td></tr>";
+    } else {
+      html += "<tr><td>Status</td><td class='warning'>Insufficient CPU capacity! Need at least " + minNodesTotal + " nodes with this configuration.</td></tr>";
+    }
+    html += "</table>";
+
+    $("result_cpu").innerHTML = html;
+
+    drawCoreChart(workloadCores, totalMgmtCores, haCores, totalAvailableCores, totalPhysicalCores);
+    drawNodeChart(nodes, physicalCoresPerNode, mgmtPerNode, availableCoresPerNode, workloadCores, workloadNodes);
+  }
+
+  /* ---- chart 1: overall core allocation ---- */
+  function drawCoreChart(workload, mgmt, ha, available, totalPhysical) {
+    const unused = Math.max(available - workload, 0);
+    const overflow = Math.max(workload - available, 0);
+
+    const labels = [];
+    const data = [];
+    const colors = [];
+
+    labels.push("Workload Cores");
+    data.push(Math.min(workload, available));
+    colors.push("rgba(128,191,255,0.9)");
+
+    if (unused > 0) {
+      labels.push("Available (Unused)");
+      data.push(unused);
+      colors.push("rgba(200,230,200,0.9)");
+    }
+
+    if (overflow > 0) {
+      labels.push("Overflow (Insufficient)");
+      data.push(overflow);
+      colors.push("rgba(255,150,150,0.9)");
+    }
+
+    labels.push("Management Overhead");
+    data.push(mgmt);
+    colors.push("rgba(211,211,211,0.9)");
+
+    if (ha > 0) {
+      labels.push("HA Reserved (1 Node)");
+      data.push(ha);
+      colors.push("rgba(179,209,255,0.9)");
+    }
+
+    const cfg = {
+      type: "doughnut",
+      data: {
+        labels: labels,
+        datasets: [{ data: data, backgroundColor: colors, borderWidth: 1 }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: { display: true, text: "Cluster Core Allocation" },
+          legend: { position: "bottom" }
+        }
+      }
+    };
+
+    if (coreChart) coreChart.destroy();
+    coreChart = new Chart(document.getElementById("coreChart").getContext("2d"), cfg);
+  }
+
+  /* ---- chart 2: per-node capacity bars ---- */
+  function drawNodeChart(nodes, coresPerNode, mgmtPerNode, availPerNode, totalWorkloadCores, workloadNodes) {
+    const labels = [];
+    const mgmtData = [];
+    const workloadData = [];
+    const freeData = [];
+
+    const workloadPerNode = workloadNodes > 0
+      ? Math.ceil(totalWorkloadCores / workloadNodes)
+      : 0;
+
+    for (let i = 1; i <= nodes; i++) {
+      labels.push("Node " + i);
+      mgmtData.push(mgmtPerNode);
+
+      const isHANode = ($("haEnabled").checked && nodes > 1 && i === nodes);
+      if (isHANode) {
+        workloadData.push(0);
+        freeData.push(availPerNode);
+      } else {
+        const assigned = Math.min(workloadPerNode, availPerNode);
+        workloadData.push(assigned);
+        freeData.push(Math.max(availPerNode - assigned, 0));
+      }
+    }
+
+    const cfg = {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [
+          { label: "Management", data: mgmtData, backgroundColor: "rgba(211,211,211,0.9)", stack: "s" },
+          { label: "VM Workload", data: workloadData, backgroundColor: "rgba(128,191,255,0.9)", stack: "s" },
+          { label: "Free", data: freeData, backgroundColor: "rgba(200,230,200,0.9)", stack: "s" }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: { display: true, text: "Per-Node Core Distribution" },
+          legend: { position: "bottom" }
+        },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, beginAtZero: true, title: { display: true, text: "Cores" } }
+        }
+      }
+    };
+
+    if (nodeChart) nodeChart.destroy();
+    nodeChart = new Chart(document.getElementById("nodeChart").getContext("2d"), cfg);
+  }
+
+  /* ---- event binding ---- */
+  $("calcBtn").addEventListener("click", calculate);
+})();
+</script>
+</body>
+</html>
