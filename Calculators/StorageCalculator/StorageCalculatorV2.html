@@ -1,0 +1,805 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1d1d1f}
+    .container{max-width:900px;margin:0 auto;padding:16px}
+
+    .card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:20px 24px;margin-bottom:16px}
+    .card h3{margin:0 0 16px;font-size:1.15em;color:#333;border-bottom:2px solid #007aff;padding-bottom:8px;display:inline-block}
+
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px}
+    @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+    .form-group{display:flex;flex-direction:column}
+    .form-group.full{grid-column:1/-1}
+    .form-group label{font-size:.85em;font-weight:600;margin-bottom:4px;color:#555}
+    .form-group input[type=number],
+    .form-group select{padding:10px 12px;border:1px solid #ccc;border-radius:8px;font-size:.95em;background:#fafafa;transition:border-color .2s}
+    .form-group input[type=number]:focus,
+    .form-group select:focus{outline:none;border-color:#007aff;background:#fff}
+    .form-group select{appearance:auto}
+
+    .chk-row{display:flex;align-items:center;gap:8px;padding:4px 0}
+    .chk-row input[type=checkbox]{width:18px;height:18px;accent-color:#007aff;cursor:pointer}
+    .chk-row label{font-size:.88em;font-weight:500;cursor:pointer;color:#444}
+
+    .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+    .btn{border:none;border-radius:8px;padding:12px 24px;font-size:.95em;font-weight:600;cursor:pointer;transition:background .2s}
+    .btn-primary{background:#007aff;color:#fff}
+    .btn-primary:hover{background:#005ecb}
+    .btn-secondary{background:#f0f0f0;color:#333;border:1px solid #ccc}
+    .btn-secondary:hover{background:#e0e0e0}
+
+    .result-box{background:#f7f9fc;border:1px solid #dde4ee;border-radius:10px;padding:16px 20px;margin-top:16px;text-align:left;font-size:.92em;line-height:1.7}
+    .result-box strong{color:#333}
+    .warning{color:#cc3300;font-weight:600}
+    .ok{color:#2e7d32;font-weight:600}
+
+    .charts-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
+    .chart-wrapper{background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px;position:relative;height:320px}
+    .chart-wrapper canvas{width:100%!important;height:100%!important}
+    @media(min-width:700px){.charts-grid.two-col{grid-template-columns:1fr 1fr}}
+
+    .overview-table{width:100%;border-collapse:collapse;font-size:.88em;margin-top:12px}
+    .overview-table th,.overview-table td{padding:8px 10px;text-align:left;border-bottom:1px solid #e5e5e5}
+    .overview-table th{background:#f5f7fa;font-weight:600;color:#444}
+    .overview-table td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+    .overview-table .section-header{background:#eaf0fb;font-weight:700;color:#007aff;font-size:.92em}
+    .overview-table .total-row{font-weight:700;background:#f0f4ff}
+    .overview-table .formula{color:#888;font-size:.82em}
+
+    /* Resiliency option cards */
+    .res-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px}
+    .res-option{border:2px solid #e0e0e0;border-radius:10px;padding:12px;cursor:pointer;transition:border-color .2s,background .2s}
+    .res-option:hover:not(.disabled){border-color:#007aff;background:#f7f9fc}
+    .res-option.selected{border-color:#007aff;background:#eaf0fb}
+    .res-option.disabled{opacity:.4;cursor:not-allowed}
+    .res-option .res-name{font-weight:700;font-size:.9em;margin-bottom:4px;color:#333}
+    .res-option .res-detail{font-size:.78em;color:#666;line-height:1.4}
+    .res-option .res-eff{font-size:.82em;font-weight:600;color:#007aff;margin-top:4px}
+
+    .tier-label{font-size:.9em;font-weight:700;color:#007aff;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid #e5e5e5}
+
+    .disclaimer{font-size:.78em;color:#666;margin-top:16px;text-align:left;line-height:1.6}
+    .disclaimer a{color:#007aff;text-decoration:none}
+    .disclaimer a:hover{text-decoration:underline}
+    .disclaimer strong{color:#444}
+
+    @media print{
+      .btn-row,.no-print{display:none!important}
+      .card{break-inside:avoid;border:none;box-shadow:none}
+      .chart-wrapper{height:260px}
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="calcRoot">
+
+
+  <!-- Card 2: Cluster Configuration -->
+  <div class="card">
+    <h3>Cluster Configuration</h3>
+    <div class="form-grid">
+      <div class="form-group full">
+        <div class="chk-row">
+          <input type="checkbox" id="singleNode">
+          <label for="singleNode">Single Node Cluster</label>
+        </div>
+      </div>
+      <div class="form-group" id="nodeCountGroup">
+        <label for="nodeCount">Number of Nodes</label>
+        <select id="nodeCount"></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: Storage Type -->
+  <div class="card">
+    <h3>Storage Configuration</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="storageType">Storage Type</label>
+        <select id="storageType">
+          <option value="full-flash">Full-Flash</option>
+          <option value="2-tier">2-Tier (Cache + Capacity)</option>
+          <option value="3-tier">3-Tier (Cache + Performance + Capacity)</option>
+        </select>
+      </div>
+      <div class="form-group" id="tierConfigGroup">
+        <label for="tierConfig">Tier Configuration</label>
+        <select id="tierConfig"></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4: Drive Configuration -->
+  <div class="card">
+    <h3>Drive Configuration</h3>
+
+    <!-- Full-Flash -->
+    <div id="drivesFullFlash">
+      <div class="tier-label" id="ffLabel">NVMe Capacity Drives</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="ffCount">Drives per Node</label>
+          <input type="number" id="ffCount" value="4" min="1" max="24" step="1">
+        </div>
+        <div class="form-group">
+          <label for="ffCapacity">Capacity per Drive (TB)</label>
+          <input type="number" id="ffCapacity" value="1.92" min="0.01" max="61.44" step="0.01">
+        </div>
+      </div>
+    </div>
+
+    <!-- 2-Tier -->
+    <div id="drives2Tier" style="display:none">
+      <div class="tier-label">Cache Tier (<span id="t2CacheType">NVMe</span>)</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="t2CacheCount">Cache Drives per Node</label>
+          <input type="number" id="t2CacheCount" value="2" min="1" max="12" step="1">
+        </div>
+        <div class="form-group">
+          <label for="t2CacheCapacity">Cache Drive Capacity (TB)</label>
+          <input type="number" id="t2CacheCapacity" value="0.8" min="0.01" max="8" step="0.01">
+        </div>
+      </div>
+      <div class="tier-label">Capacity Tier (<span id="t2CapType">SSD</span>)</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="t2CapCount">Capacity Drives per Node</label>
+          <input type="number" id="t2CapCount" value="4" min="1" max="24" step="1">
+        </div>
+        <div class="form-group">
+          <label for="t2CapCapacity">Capacity per Drive (TB)</label>
+          <input type="number" id="t2CapCapacity" value="3.84" min="0.01" max="61.44" step="0.01">
+        </div>
+      </div>
+    </div>
+
+    <!-- 3-Tier -->
+    <div id="drives3Tier" style="display:none">
+      <div class="tier-label">Cache Tier (NVMe)</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="t3CacheCount">NVMe Cache Drives per Node</label>
+          <input type="number" id="t3CacheCount" value="2" min="1" max="12" step="1">
+        </div>
+        <div class="form-group">
+          <label for="t3CacheCapacity">NVMe Cache Capacity (TB)</label>
+          <input type="number" id="t3CacheCapacity" value="0.8" min="0.01" max="8" step="0.01">
+        </div>
+      </div>
+      <div class="tier-label">Performance Tier (SSD)</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="t3SsdCount">SSD Drives per Node</label>
+          <input type="number" id="t3SsdCount" value="2" min="1" max="24" step="1">
+        </div>
+        <div class="form-group">
+          <label for="t3SsdCapacity">SSD Capacity per Drive (TB)</label>
+          <input type="number" id="t3SsdCapacity" value="1.92" min="0.01" max="30.72" step="0.01">
+        </div>
+      </div>
+      <div class="tier-label">Capacity Tier (HDD)</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="t3HddCount">HDD Drives per Node</label>
+          <input type="number" id="t3HddCount" value="4" min="1" max="24" step="1">
+        </div>
+        <div class="form-group">
+          <label for="t3HddCapacity">HDD Capacity per Drive (TB)</label>
+          <input type="number" id="t3HddCapacity" value="8" min="0.01" max="30.72" step="0.01">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 5: Resiliency -->
+  <div class="card">
+    <h3>Storage Resiliency</h3>
+    <p style="font-size:.85em;color:#666;margin:0 0 10px">Available resiliency options depend on your cluster size. Some options may be hidden based on node count.</p>
+    <div id="resiliencyOptions" class="res-options"></div>
+  </div>
+
+  <!-- Actions -->
+  <div class="btn-row">
+    <button class="btn btn-primary" id="calcBtn">Calculate Storage Capacity</button>
+    <button class="btn btn-secondary" id="exportPdfBtn" style="display:none">Export to PDF</button>
+  </div>
+
+  <!-- Results -->
+  <div id="resultBox" class="result-box" style="display:none"></div>
+
+  <!-- Charts -->
+  <div id="chartsSection" style="display:none">
+    <div class="charts-grid two-col">
+      <div class="chart-wrapper"><canvas id="capacityChart"></canvas></div>
+      <div class="chart-wrapper"><canvas id="volumesChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Overview -->
+  <div id="overviewSection" class="card" style="display:none">
+    <h3>Full Overview</h3>
+    <table class="overview-table" id="overviewTable"></table>
+  </div>
+
+  <!-- Disclaimers -->
+  <div class="disclaimer">
+    <p>
+      <strong>Storage Spaces Direct (S2D) Disclaimer:</strong><br>
+      This calculator estimates storage capacity for Storage Spaces Direct deployments on Azure Local. Calculations are based on current best practices and deployment guidelines. Actual results may vary depending on firmware, driver versions, and workload patterns. Always refer to the
+      <a href="https://learn.microsoft.com/en-us/azure-stack/hci/concepts/plan-volumes" target="_blank">official Microsoft documentation</a>
+      for the most up-to-date information.
+    </p>
+    <p>
+      <strong>Redundancy Disclaimer:</strong><br>
+      When using 1 or 2 nodes, S2D employs Two-Way Mirror redundancy, which stores 2 copies of data. With 3+ nodes, Three-Way Mirror becomes available, storing 3 copies across different fault domains. Dual Parity requires 4+ nodes and uses erasure coding with 2 parity stripes. For a single-node configuration, a local mirror is used across drives within the same node.
+    </p>
+    <p>
+      <strong>Dual Parity Warning:</strong><br>
+      Dual Parity deviates from the standard Azure Local recommended configuration. It provides better storage efficiency than mirroring but with significantly lower write performance and higher rebuild times after a failure. It is only suitable for specific use cases (e.g., cold or archival data workloads) and should only be used if you fully understand the implications. The standard recommendation for Azure Local production deployments is Three-Way Mirror.
+    </p>
+    <p>
+      <strong>Reserved Capacity Disclaimer:</strong><br>
+      For multi-node configurations, the calculator reserves capacity equivalent to one capacity drive per node to ensure sufficient unallocated space for automatic repairs after a drive failure. For single-node clusters, no reserved capacity is applied. Actual reserve behavior may differ based on
+      <a href="https://learn.microsoft.com/en-us/azure-stack/hci/concepts/plan-volumes#reserve-capacity" target="_blank">Microsoft reserve capacity documentation</a>.
+    </p>
+    <p>
+      <strong>Cache Tier Disclaimer:</strong><br>
+      In 2-tier and 3-tier configurations, the fastest drive type acts as a read/write cache and does not contribute to usable storage capacity. In full-flash configurations (all NVMe or all SSD), there is no separate cache tier and all drives serve as capacity. For optimal cache performance, RDMA networking is recommended.
+    </p>
+    <p>
+      <strong>Infrastructure Overhead:</strong><br>
+      Approximately 300 GB is reserved for infrastructure volumes including Infrastructure_1 (ARC Resource Bridge and AKS images, ~250 GB), ClusterPerformanceHistory (~20 GB), and additional system overhead (~7 GB). These values are approximate and may change based on deployment specifics.
+    </p>
+    <p>
+      <strong>Volume Distribution Disclaimer:</strong><br>
+      During cloud deployment, the assignment of volumes within the storage pool (SU1_Pool) is automated. The remaining usable capacity after infrastructure volumes is divided equally among UserStorage volumes (one per node). These values are approximate and subject to change.
+    </p>
+    <p>
+      <strong>Dual Parity Efficiency:</strong><br>
+      Dual parity efficiency depends on the number of fault domains (nodes). With N nodes, the efficiency is calculated as (N-2)/N, up to a maximum of 6 data columns + 2 parity columns (75% efficiency at 8+ nodes). Dual parity provides better storage efficiency than mirrors but with lower write performance.
+    </p>
+
+    <p>
+      <strong>No Warranty:</strong><br>
+      All information in this Storage Calculator is provided "as is" with no warranties, express or implied. It does not represent official Microsoft documentation. Always verify with your hardware vendor and Microsoft documentation for accurate sizing and configuration.
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const num = el => +(el.value) || 0;
+
+  let capChart = null, volChart = null;
+  let selectedResiliency = "two-way";
+
+  /* ================================================================
+     INIT: populate node count dropdown (2-16)
+     ================================================================ */
+  (function initNodeSelect() {
+    const sel = $("nodeCount");
+    for (let i = 2; i <= 16; i++) {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = i;
+      sel.appendChild(opt);
+    }
+  })();
+
+  /* ================================================================
+     HELPERS
+     ================================================================ */
+  function getNodes() {
+    return $("singleNode").checked ? 1 : parseInt($("nodeCount").value) || 2;
+  }
+
+  function fmtTB(v) { return v.toFixed(2) + " TB"; }
+
+
+  function storageTypeLabel(type, config) {
+    if (type === "full-flash") return "Full-Flash (" + (config === "nvme" ? "NVMe" : "SSD") + ")";
+    if (type === "2-tier") {
+      var map = { "nvme-ssd": "NVMe (Cache) + SSD (Capacity)", "nvme-hdd": "NVMe (Cache) + HDD (Capacity)", "ssd-hdd": "SSD (Cache) + HDD (Capacity)" };
+      return "2-Tier: " + (map[config] || config);
+    }
+    return "3-Tier: NVMe (Cache) + SSD (Perf.) + HDD (Cap.)";
+  }
+
+  function resiliencyLabel(id) {
+    var r = resiliencyDefs.find(function (d) { return d.id === id; });
+    return r ? r.name : id;
+  }
+
+  /* ================================================================
+     RESILIENCY DEFINITIONS
+     ================================================================ */
+  var resiliencyDefs = [
+    { id: "two-way",     name: "Two-Way Mirror",   desc: "Stores 2 copies of data across different nodes/drives",       minNodes: 1, maxNodes: 0, failures: 1 },
+    { id: "three-way",   name: "Three-Way Mirror", desc: "Stores 3 copies across 3 different fault domains",            minNodes: 3, maxNodes: 0, failures: 2 },
+    { id: "dual-parity", name: "Dual Parity",      desc: "Erasure coding with 2 parity stripes for space efficiency",   minNodes: 4, maxNodes: 0, failures: 2 }
+  ];
+
+  function getEfficiency(resId, nodes) {
+    switch (resId) {
+      case "two-way":     return 0.50;
+      case "three-way":   return 1 / 3;
+      case "dual-parity": {
+        var cols = Math.min(nodes, 8);
+        return (cols - 2) / cols;
+      }
+      default: return 0.50;
+    }
+  }
+
+  function isResAvailable(r, nodes) {
+    if (nodes < r.minNodes) return false;
+    if (r.maxNodes > 0 && nodes > r.maxNodes) return false;
+    return true;
+  }
+
+  /* ================================================================
+     DYNAMIC UI UPDATES
+     ================================================================ */
+
+  /* --- Single node toggle --- */
+  $("singleNode").addEventListener("change", function () {
+    $("nodeCountGroup").style.display = this.checked ? "none" : "";
+    updateResiliencyOptions();
+  });
+
+  $("nodeCount").addEventListener("change", updateResiliencyOptions);
+
+  /* --- Storage type / tier config --- */
+  $("storageType").addEventListener("change", function () {
+    updateTierConfig();
+    updateDriveUI();
+    updateResiliencyOptions();
+  });
+
+  $("tierConfig").addEventListener("change", updateDriveLabels);
+
+  function updateTierConfig() {
+    var type = $("storageType").value;
+    var tc = $("tierConfig");
+    tc.innerHTML = "";
+
+    if (type === "full-flash") {
+      tc.add(new Option("NVMe as Capacity", "nvme"));
+      tc.add(new Option("SSD as Capacity", "ssd"));
+      $("tierConfigGroup").style.display = "";
+    } else if (type === "2-tier") {
+      tc.add(new Option("NVMe (Cache) + SSD (Capacity)", "nvme-ssd"));
+      tc.add(new Option("NVMe (Cache) + HDD (Capacity)", "nvme-hdd"));
+      tc.add(new Option("SSD (Cache) + HDD (Capacity)", "ssd-hdd"));
+      $("tierConfigGroup").style.display = "";
+    } else {
+      $("tierConfigGroup").style.display = "none";
+    }
+    updateDriveLabels();
+  }
+
+  function updateDriveLabels() {
+    var type = $("storageType").value;
+    var config = $("tierConfig").value;
+
+    if (type === "full-flash") {
+      $("ffLabel").textContent = (config === "nvme" ? "NVMe" : "SSD") + " Capacity Drives";
+    } else if (type === "2-tier") {
+      if (config === "nvme-ssd")      { $("t2CacheType").textContent = "NVMe"; $("t2CapType").textContent = "SSD"; }
+      else if (config === "nvme-hdd") { $("t2CacheType").textContent = "NVMe"; $("t2CapType").textContent = "HDD"; }
+      else                            { $("t2CacheType").textContent = "SSD";  $("t2CapType").textContent = "HDD"; }
+    }
+  }
+
+  function updateDriveUI() {
+    var type = $("storageType").value;
+    $("drivesFullFlash").style.display = type === "full-flash" ? "" : "none";
+    $("drives2Tier").style.display     = type === "2-tier"     ? "" : "none";
+    $("drives3Tier").style.display     = type === "3-tier"     ? "" : "none";
+  }
+
+  /* --- Resiliency options --- */
+  function updateResiliencyOptions() {
+    var nodes = getNodes();
+    var container = $("resiliencyOptions");
+    container.innerHTML = "";
+
+    var firstAvailable = null;
+    var currentStillValid = false;
+
+    for (var i = 0; i < resiliencyDefs.length; i++) {
+      var r = resiliencyDefs[i];
+      var available = isResAvailable(r, nodes);
+      var eff = getEfficiency(r.id, nodes);
+
+      var dualParityWarning = r.id === "dual-parity"
+        ? '<div style="font-size:.74em;color:#cc3300;font-weight:600;margin-top:6px;padding:4px 6px;background:#fff3f0;border-radius:4px;border-left:2px solid #cc3300">Not recommended for standard deployments. Deviates from standard configuration — only use if you know what you are doing.</div>'
+        : "";
+      var div = document.createElement("div");
+      div.className = "res-option" + (available ? "" : " disabled") + (selectedResiliency === r.id && available ? " selected" : "");
+      div.innerHTML = '<div class="res-name">' + r.name + '</div>' +
+        '<div class="res-detail">' + r.desc + '</div>' +
+        '<div class="res-eff">Efficiency: ' + (eff * 100).toFixed(1) + '% | Tolerates: ' + r.failures + ' failure' + (r.failures > 1 ? 's' : '') + '</div>' +
+        dualParityWarning;
+
+      if (available) {
+        if (!firstAvailable) firstAvailable = r.id;
+        if (selectedResiliency === r.id) currentStillValid = true;
+        (function (rid) {
+          div.addEventListener("click", function () {
+            selectedResiliency = rid;
+            updateResiliencyOptions();
+          });
+        })(r.id);
+      }
+      container.appendChild(div);
+    }
+
+    if (!currentStillValid && firstAvailable) {
+      selectedResiliency = firstAvailable;
+      updateResiliencyOptions();
+      return;
+    }
+
+  }
+
+
+  /* ================================================================
+     MAIN CALCULATION
+     ================================================================ */
+  function calculate() {
+    var nodes       = getNodes();
+    var storageType = $("storageType").value;
+    var tierConfig  = $("tierConfig").value;
+
+    /* --- Gather drive data --- */
+    var cacheLabel = "", cacheType = "", cacheCount = 0, cacheCap = 0;
+    var capacityTiers = [];
+
+    if (storageType === "full-flash") {
+      var driveType = tierConfig === "nvme" ? "NVMe" : "SSD";
+      capacityTiers.push({
+        label: driveType + " Capacity", type: driveType,
+        count: Math.max(num($("ffCount")), 1),
+        capacity: Math.max(num($("ffCapacity")), 0.01)
+      });
+    } else if (storageType === "2-tier") {
+      var parts = tierConfig.split("-");
+      cacheType  = parts[0] === "nvme" ? "NVMe" : "SSD";
+      var capType = parts[1] === "ssd" ? "SSD" : "HDD";
+      cacheLabel = cacheType + " Cache";
+      cacheCount = Math.max(num($("t2CacheCount")), 1);
+      cacheCap   = Math.max(num($("t2CacheCapacity")), 0.01);
+      capacityTiers.push({
+        label: capType + " Capacity", type: capType,
+        count: Math.max(num($("t2CapCount")), 1),
+        capacity: Math.max(num($("t2CapCapacity")), 0.01)
+      });
+    } else {
+      cacheLabel = "NVMe Cache"; cacheType = "NVMe";
+      cacheCount = Math.max(num($("t3CacheCount")), 1);
+      cacheCap   = Math.max(num($("t3CacheCapacity")), 0.01);
+      capacityTiers.push({
+        label: "SSD Performance", type: "SSD",
+        count: Math.max(num($("t3SsdCount")), 1),
+        capacity: Math.max(num($("t3SsdCapacity")), 0.01)
+      });
+      capacityTiers.push({
+        label: "HDD Capacity", type: "HDD",
+        count: Math.max(num($("t3HddCount")), 1),
+        capacity: Math.max(num($("t3HddCapacity")), 0.01)
+      });
+    }
+
+    /* --- Capacity calculations --- */
+    var rawPerNode = 0;
+    for (var i = 0; i < capacityTiers.length; i++) {
+      rawPerNode += capacityTiers[i].count * capacityTiers[i].capacity;
+    }
+    var totalRaw = rawPerNode * nodes;
+
+    var cacheRawPerNode = cacheCount * cacheCap;
+    var totalCacheRaw   = cacheRawPerNode * nodes;
+
+    /* Reserve: one capacity drive per node (largest drive) */
+    var maxDriveCap = 0;
+    for (var j = 0; j < capacityTiers.length; j++) {
+      if (capacityTiers[j].capacity > maxDriveCap) maxDriveCap = capacityTiers[j].capacity;
+    }
+    var reserveCapacity = nodes > 1 ? nodes * maxDriveCap : 0;
+
+    var effective = Math.max(totalRaw - reserveCapacity, 0);
+
+    /* Resiliency */
+    var efficiency = getEfficiency(selectedResiliency, nodes);
+    var usableAfterRes   = effective * efficiency;
+    var resiliencyOverhead = effective - usableAfterRes;
+
+    /* Infrastructure overhead */
+    var infraOverhead = 0.30;
+
+    /* Net usable */
+    var netUsable    = Math.max(usableAfterRes - infraOverhead, 0);
+    var netUsableTiB = netUsable * 0.909495;
+
+    /* Storage efficiency */
+    var storageEfficiency = totalRaw > 0 ? (netUsable / totalRaw * 100) : 0;
+
+    /* Drive totals */
+    var totalCapDrivesPerNode = 0;
+    for (var k = 0; k < capacityTiers.length; k++) totalCapDrivesPerNode += capacityTiers[k].count;
+    var totalCapDrivesCluster   = totalCapDrivesPerNode * nodes;
+    var totalCacheDrivesCluster = cacheCount * nodes;
+    var totalDrivesPerNode      = totalCapDrivesPerNode + cacheCount;
+    var totalDrivesCluster      = totalDrivesPerNode * nodes;
+
+    /* Volume distribution */
+    var infra1       = 0.250;
+    var clusterPerf  = 0.020;
+    var extraReserve = 0.007;
+    var volumeOH     = infra1 + clusterPerf + extraReserve;
+    var remainingForUser  = Math.max(netUsable - volumeOH, 0);
+    var userStoragePerNode = nodes > 0 ? remainingForUser / nodes : 0;
+
+    /* ---- Result box ---- */
+    var rb = $("resultBox");
+    rb.style.display = "block";
+    var h = "";
+    h += "<strong>Cluster:</strong> " + nodes + " node" + (nodes > 1 ? "s" : "") + (nodes === 1 ? " (Single Node)" : "") + "<br>";
+    h += "<strong>Storage Type:</strong> " + storageTypeLabel(storageType, tierConfig) + "<br>";
+    h += "<strong>Resiliency:</strong> " + resiliencyLabel(selectedResiliency) + " (" + (efficiency * 100).toFixed(1) + "% efficiency)<br>";
+    h += "<hr style='border:none;border-top:1px solid #dde4ee;margin:8px 0'>";
+    h += "<strong>Total Raw Capacity (per Node):</strong> " + fmtTB(rawPerNode) + "<br>";
+    h += "<strong>Total Raw Capacity (Cluster):</strong> " + fmtTB(totalRaw) + "<br>";
+    if (totalCacheRaw > 0) {
+      h += "<strong>Cache Capacity (Cluster):</strong> " + fmtTB(totalCacheRaw) + " (not counted toward usable)<br>";
+    }
+    h += "<strong>Reserve Capacity:</strong> " + fmtTB(reserveCapacity) + "<br>";
+    h += "<strong>Resiliency Overhead:</strong> " + fmtTB(resiliencyOverhead) + "<br>";
+    h += "<strong>Infrastructure Overhead:</strong> " + fmtTB(infraOverhead) + "<br>";
+    h += "<strong>Actual Storage Efficiency:</strong> " + storageEfficiency.toFixed(1) + "%<br>";
+    h += '<strong>Net Usable Capacity:</strong> <span class="ok">' + fmtTB(netUsable) + " (" + netUsableTiB.toFixed(2) + " TiB)</span>";
+    rb.innerHTML = h;
+
+    /* ---- Charts ---- */
+    $("chartsSection").style.display = "block";
+    drawCapacityChart(netUsable, resiliencyOverhead, reserveCapacity, infraOverhead);
+    drawVolumesChart(infra1, clusterPerf, userStoragePerNode, nodes);
+
+    /* ---- Overview table ---- */
+    buildOverview({
+      nodes: nodes, storageType: storageType, tierConfig: tierConfig,
+      cacheLabel: cacheLabel, cacheType: cacheType, cacheCount: cacheCount, cacheCap: cacheCap,
+      cacheRawPerNode: cacheRawPerNode, totalCacheRaw: totalCacheRaw,
+      capacityTiers: capacityTiers, rawPerNode: rawPerNode, totalRaw: totalRaw,
+      reserveCapacity: reserveCapacity, maxDriveCap: maxDriveCap,
+      effective: effective, efficiency: efficiency, resId: selectedResiliency,
+      usableAfterRes: usableAfterRes, resiliencyOverhead: resiliencyOverhead,
+      infraOverhead: infraOverhead, netUsable: netUsable, netUsableTiB: netUsableTiB,
+      storageEfficiency: storageEfficiency,
+      totalDrivesPerNode: totalDrivesPerNode, totalDrivesCluster: totalDrivesCluster,
+      totalCapDrivesPerNode: totalCapDrivesPerNode, totalCapDrivesCluster: totalCapDrivesCluster,
+      totalCacheDrivesCluster: totalCacheDrivesCluster,
+      infra1: infra1, clusterPerf: clusterPerf, extraReserve: extraReserve, volumeOH: volumeOH,
+      remainingForUser: remainingForUser, userStoragePerNode: userStoragePerNode
+    });
+
+    $("exportPdfBtn").style.display = "inline-block";
+  }
+
+  /* ================================================================
+     CHARTS
+     ================================================================ */
+  function drawCapacityChart(usable, resiliency, reserve, infra) {
+    var labels = ["Net Usable", "Resiliency Overhead", "Reserve Capacity", "Infrastructure"];
+    var data   = [usable, resiliency, reserve, infra];
+    var colors = ["rgba(0,122,255,.75)", "rgba(90,200,250,.75)", "rgba(175,175,175,.75)", "rgba(255,149,0,.75)"];
+
+    var cfg = {
+      type: "doughnut",
+      data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 1 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          title: { display: true, text: "Capacity Breakdown", font: { size: 14 } },
+          legend: { position: "bottom", labels: { boxWidth: 12 } }
+        }
+      }
+    };
+    if (capChart) capChart.destroy();
+    capChart = new Chart($("capacityChart").getContext("2d"), cfg);
+  }
+
+  function drawVolumesChart(infra1, clusterPerf, userPerNode, nodes) {
+    var labels = ["Infrastructure_1", "ClusterPerfHistory"];
+    var data   = [infra1, clusterPerf];
+    for (var i = 1; i <= nodes; i++) {
+      labels.push("UserStorage_" + i);
+      data.push(userPerNode);
+    }
+
+    var cfg = {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{ label: "Volume Size (TB)", data: data, backgroundColor: "rgba(0,122,255,.75)" }]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          title: { display: true, text: "Volume Distribution", font: { size: 14 } },
+          legend: { display: false }
+        },
+        scales: {
+          x: { title: { display: true, text: "TB" }, beginAtZero: true },
+          y: { ticks: { autoSkip: false, font: { size: 11 } } }
+        }
+      }
+    };
+    if (volChart) volChart.destroy();
+    volChart = new Chart($("volumesChart").getContext("2d"), cfg);
+  }
+
+  /* ================================================================
+     OVERVIEW TABLE
+     ================================================================ */
+  function buildOverview(d) {
+    $("overviewSection").style.display = "block";
+    var rows = [];
+
+    function sec(t) { rows.push('<tr class="section-header"><td colspan="3">' + t + '</td></tr>'); }
+    function row(l, f, v) { rows.push('<tr><td>' + l + '</td><td class="formula">' + f + '</td><td>' + v + '</td></tr>'); }
+    function total(l, v) { rows.push('<tr class="total-row"><td colspan="2">' + l + '</td><td>' + v + '</td></tr>'); }
+
+    rows.push('<thead><tr><th>Item</th><th>Calculation</th><th>Value</th></tr></thead><tbody>');
+
+    /* --- Cluster --- */
+    sec("Cluster Configuration");
+    row("Cluster Type", "", d.nodes === 1 ? "Single Node Cluster" : "Multi-Node Cluster");
+    row("Number of Nodes", "User-defined", d.nodes);
+    row("Storage Type", "", storageTypeLabel(d.storageType, d.tierConfig));
+    row("Resiliency", resiliencyLabel(d.resId), (d.efficiency * 100).toFixed(1) + "% efficiency");
+
+    /* --- Drive Configuration --- */
+    sec("Drive Configuration");
+    if (d.cacheCount > 0) {
+      row(d.cacheLabel + " per Node", d.cacheCount + " x " + d.cacheCap.toFixed(2) + " TB", fmtTB(d.cacheRawPerNode));
+      row(d.cacheLabel + " Cluster Total", fmtTB(d.cacheRawPerNode) + " x " + d.nodes + " nodes", fmtTB(d.totalCacheRaw) + " (cache only)");
+    }
+    for (var i = 0; i < d.capacityTiers.length; i++) {
+      var t = d.capacityTiers[i];
+      var perNode = t.count * t.capacity;
+      row(t.label + " per Node", t.count + " x " + t.capacity.toFixed(2) + " TB", fmtTB(perNode));
+      row(t.label + " Cluster Total", fmtTB(perNode) + " x " + d.nodes + " nodes", fmtTB(perNode * d.nodes));
+    }
+    row("Total Drives per Node", d.cacheCount > 0 ? d.cacheCount + " cache + " + d.totalCapDrivesPerNode + " capacity" : d.totalCapDrivesPerNode + " capacity", d.totalDrivesPerNode + " drives");
+    row("Total Drives (Cluster)", d.totalDrivesPerNode + " x " + d.nodes + " nodes", d.totalDrivesCluster + " drives");
+
+    /* --- Capacity Calculation --- */
+    sec("Capacity Calculation");
+    row("Raw Capacity per Node", "Sum of capacity drives", fmtTB(d.rawPerNode));
+    row("Total Raw Capacity", fmtTB(d.rawPerNode) + " x " + d.nodes + " nodes", fmtTB(d.totalRaw));
+    if (d.nodes > 1) {
+      row("Reserve Capacity", d.nodes + " nodes x " + fmtTB(d.maxDriveCap) + " (1 drive/node)", fmtTB(d.reserveCapacity));
+    } else {
+      row("Reserve Capacity", "Single node - no reserve", "0.00 TB");
+    }
+    row("Effective Capacity", fmtTB(d.totalRaw) + " - " + fmtTB(d.reserveCapacity), fmtTB(d.effective));
+    row("Resiliency Overhead", fmtTB(d.effective) + " x (1 - " + (d.efficiency * 100).toFixed(1) + "%)", fmtTB(d.resiliencyOverhead));
+    row("Usable after Resiliency", fmtTB(d.effective) + " x " + (d.efficiency * 100).toFixed(1) + "%", fmtTB(d.usableAfterRes));
+    row("Infrastructure Overhead", "ARC RB + AKS + Cluster services", fmtTB(d.infraOverhead));
+    total("Net Usable Capacity", fmtTB(d.netUsable) + " (" + d.netUsableTiB.toFixed(2) + " TiB)");
+    row("Actual Storage Efficiency", fmtTB(d.netUsable) + " / " + fmtTB(d.totalRaw), d.storageEfficiency.toFixed(1) + "%");
+
+    /* --- Volume Distribution --- */
+    sec("Volume Distribution (estimated)");
+    row("Infrastructure_1", "ARC Resource Bridge + AKS images", (d.infra1 * 1000).toFixed(0) + " GB");
+    row("ClusterPerformanceHistory", "Cluster statistics", (d.clusterPerf * 1000).toFixed(0) + " GB");
+    row("Extra Reserved", "System overhead", (d.extraReserve * 1000).toFixed(0) + " GB");
+    for (var n = 1; n <= d.nodes; n++) {
+      row("UserStorage_" + n, fmtTB(d.remainingForUser) + " / " + d.nodes + " nodes", fmtTB(d.userStoragePerNode));
+    }
+    total("Total Volume Allocation", fmtTB(d.volumeOH + d.remainingForUser));
+
+    rows.push("</tbody>");
+    $("overviewTable").innerHTML = rows.join("");
+  }
+
+  /* ================================================================
+     PDF EXPORT
+     ================================================================ */
+  function exportPdf() {
+    var btn = $("exportPdfBtn");
+    btn.textContent = "Generating...";
+    btn.disabled = true;
+
+    try {
+      var root = $("calcRoot");
+
+      /* Capture chart canvases to static images before cloning */
+      var chartImages = {};
+      root.querySelectorAll("canvas").forEach(function(c) {
+        try { chartImages[c.id] = c.toDataURL("image/png"); } catch(e) {}
+      });
+
+      /* Clone the calculator root */
+      var clone = root.cloneNode(true);
+
+      /* Replace canvas elements with img snapshots */
+      clone.querySelectorAll("canvas").forEach(function(c) {
+        var img = document.createElement("img");
+        img.src = chartImages[c.id] || "";
+        img.style.cssText = "width:100%;height:100%;object-fit:contain;display:block";
+        c.parentNode.replaceChild(img, c);
+      });
+
+      /* Hide buttons and no-print elements */
+      clone.querySelectorAll(".btn-row,.no-print").forEach(function(el) {
+        el.style.display = "none";
+      });
+
+      /* Extract inline styles from this document */
+      var styles = "";
+      for (var i = 0; i < document.styleSheets.length; i++) {
+        try {
+          var rules = document.styleSheets[i].cssRules || document.styleSheets[i].rules;
+          for (var j = 0; j < rules.length; j++) styles += rules[j].cssText + "\n";
+        } catch(e) {}
+      }
+
+      /* Open a dedicated print window */
+      var win = window.open("", "_blank", "width=960,height=800");
+      if (!win) {
+        alert("Pop-up blocked. Allow pop-ups for this page and try again, or use Ctrl+P to print.");
+        btn.textContent = "Export to PDF";
+        btn.disabled = false;
+        return;
+      }
+
+      win.document.write(
+        "<!DOCTYPE html><html lang='en'><head>" +
+        "<meta charset='UTF-8'>" +
+        "<title>Azure Local Storage Calculator - Export</title>" +
+        "<style>" + styles + "</style>" +
+        "<style>body{margin:0;padding:16px;background:#fff}" +
+        ".btn-row,.no-print{display:none!important}" +
+        "@media print{.btn-row,.no-print{display:none!important}}</style>" +
+        "</head><body>" + clone.outerHTML + "</body></html>"
+      );
+      win.document.close();
+      setTimeout(function() { win.print(); }, 500);
+
+    } catch(err) {
+      console.error("Export failed:", err);
+      alert("Export failed: " + (err.message || err) + "\nUse Ctrl+P / Cmd+P to print instead.");
+    }
+
+    btn.textContent = "Export to PDF";
+    btn.disabled = false;
+  }
+
+  /* ================================================================
+     EVENTS & INIT
+     ================================================================ */
+  $("calcBtn").addEventListener("click", calculate);
+  $("exportPdfBtn").addEventListener("click", exportPdf);
+
+  updateTierConfig();
+  updateDriveUI();
+  updateResiliencyOptions();
+
+})();
+</script>
+</body>
+</html>

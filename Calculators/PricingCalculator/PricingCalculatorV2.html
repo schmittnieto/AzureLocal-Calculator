@@ -3,8 +3,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
   <style>
     *{box-sizing:border-box}
     body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1d1d1f}
@@ -606,42 +604,70 @@
   /* ================================================================
      PDF EXPORT
      ================================================================ */
-  async function exportPdf() {
+  function exportPdf() {
     const btn = $("exportPdfBtn");
-    btn.textContent = "Generating PDF...";
+    btn.textContent = "Generating...";
     btn.disabled = true;
 
     try {
       const root = $("calcRoot");
-      const canvas = await html2canvas(root, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-      const imgData = canvas.toDataURL("image/png");
 
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      /* Capture chart canvases to static images before cloning */
+      const chartImages = {};
+      root.querySelectorAll("canvas").forEach(c => {
+        try { chartImages[c.id] = c.toDataURL("image/png"); } catch(e) {}
+      });
 
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-      const usableW = pageW - margin * 2;
-      const imgH = (canvas.height * usableW) / canvas.width;
+      /* Clone the calculator root */
+      const clone = root.cloneNode(true);
 
-      let y = margin;
-      let remaining = imgH;
-      const usableH = pageH - margin * 2;
+      /* Replace canvas elements with img snapshots */
+      clone.querySelectorAll("canvas").forEach(c => {
+        const img = document.createElement("img");
+        img.src = chartImages[c.id] || "";
+        img.style.cssText = "width:100%;height:100%;object-fit:contain;display:block";
+        c.parentNode.replaceChild(img, c);
+      });
 
-      /* slice the image across pages */
-      while (remaining > 0) {
-        const sliceH = Math.min(remaining, usableH);
-        const sourceY = imgH - remaining;
-        pdf.addImage(imgData, "PNG", margin, y - sourceY, usableW, imgH);
-        remaining -= usableH;
-        if (remaining > 0) { pdf.addPage(); y = margin; }
+      /* Hide buttons and no-print elements */
+      clone.querySelectorAll(".btn-row,.no-print").forEach(el => {
+        el.style.display = "none";
+      });
+
+      /* Extract inline styles from this document */
+      let styles = "";
+      for (let i = 0; i < document.styleSheets.length; i++) {
+        try {
+          const rules = document.styleSheets[i].cssRules || document.styleSheets[i].rules;
+          for (let j = 0; j < rules.length; j++) styles += rules[j].cssText + "\n";
+        } catch(e) {}
       }
 
-      pdf.save("AzureLocal-PricingEstimate.pdf");
-    } catch (err) {
-      console.error("PDF export failed:", err);
-      alert("PDF export failed. You can also use your browser's Print to PDF (Ctrl+P) as a fallback.");
+      /* Open a dedicated print window */
+      const win = window.open("", "_blank", "width=960,height=800");
+      if (!win) {
+        alert("Pop-up blocked. Allow pop-ups for this page and try again, or use Ctrl+P to print.");
+        btn.textContent = "Export to PDF";
+        btn.disabled = false;
+        return;
+      }
+
+      win.document.write(
+        "<!DOCTYPE html><html lang='en'><head>" +
+        "<meta charset='UTF-8'>" +
+        "<title>Azure Local Pricing Calculator - Export</title>" +
+        "<style>" + styles + "</style>" +
+        "<style>body{margin:0;padding:16px;background:#fff}" +
+        ".btn-row,.no-print{display:none!important}" +
+        "@media print{.btn-row,.no-print{display:none!important}}</style>" +
+        "</head><body>" + clone.outerHTML + "</body></html>"
+      );
+      win.document.close();
+      setTimeout(() => { win.print(); }, 500);
+
+    } catch(err) {
+      console.error("Export failed:", err);
+      alert("Export failed: " + (err.message || err) + "\nUse Ctrl+P / Cmd+P to print instead.");
     }
 
     btn.textContent = "Export to PDF";
