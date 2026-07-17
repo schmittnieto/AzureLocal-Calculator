@@ -120,6 +120,19 @@
     <h3>License Price</h3>
     <div class="form-grid">
       <div class="form-group full">
+        <label for="pricingV2_deploymentModel">Azure Local Deployment Model</label>
+        <select id="pricingV2_deploymentModel">
+          <option value="l1">L1: Hyperconverged without external storage (10/core/month)</option>
+          <option value="l2">L2: Disaggregated or external storage (20.10/core/month)</option>
+          <option value="l2-oem">L2: OEM license with external storage (10/core/month)</option>
+          <option value="l3">L3: Disconnected operations (user-provided rate)</option>
+        </select>
+      </div>
+      <div class="form-group full" id="pricingV2_l3RateContainer" style="display:none">
+        <label for="pricingV2_l3HostRate">L3 Host Fee per Physical Core / Month</label>
+        <input type="number" id="pricingV2_l3HostRate" placeholder="Enter a planning rate or account-specific quote" min="0.01" step="0.01">
+      </div>
+      <div class="form-group full">
         <label for="pricingV2_coresPerNode">Physical Cores per Node</label>
         <input type="number" id="pricingV2_coresPerNode" value="16" min="1" max="128" step="1">
       </div>
@@ -127,7 +140,7 @@
     <div style="margin-top:12px">
       <div class="chk-row">
         <input type="checkbox" id="pricingV2_waiveHostFee">
-        <label for="pricingV2_waiveHostFee">Waive Azure Local Host Fee (saves 10/core/month)</label>
+        <label for="pricingV2_waiveHostFee">Apply Azure Hybrid Benefit to the L1 Host Fee (saves 10/core/month)</label>
       </div>
       <div class="chk-row">
         <input type="checkbox" id="pricingV2_waiveWindowsLicense">
@@ -136,6 +149,10 @@
       <div class="chk-row">
         <input type="checkbox" id="pricingV2_customLicenseChk">
         <label for="pricingV2_customLicenseChk">Use Custom Windows License Pricing (per Node)</label>
+      </div>
+      <div class="chk-row">
+        <input type="checkbox" id="pricingV2_applyTrial" checked>
+        <label for="pricingV2_applyTrial">Apply the Free 60-Day Trial to Term Estimates</label>
       </div>
     </div>
     <div id="pricingV2_customLicenseContainer" style="display:none;margin-top:12px">
@@ -312,14 +329,22 @@
     </p>
     <ul>
       <li><strong>Infrastructure Price:</strong> Node and switch costs (one-time).</li>
-      <li><strong>License Price:</strong> Host fee (10/core), Windows Server fee (23.30/core) - or custom pricing: monthly + one-time cost per node.</li>
+      <li><strong>License Price:</strong> L1 host fee (10/core), L2 host fee (20.10/core), user-provided L3 host fee, Windows Server fee (23.30/core) or custom Windows pricing.</li>
       <li><strong>Related Costs:</strong> Additional one-time and monthly costs for external services (e.g., Backup, security software).</li>
       <li><strong>Service Price:</strong> Azure Virtual Desktop (AVD) and SQL Managed Instance (SQLmi) usage costs (monthly).</li>
     </ul>
     <p>Actual costs may vary depending on vendor quotes, hardware configurations, and licensing agreements.</p>
     <p>
+      <strong>Azure Local Deployment Model Disclaimer:</strong><br>
+      L1 applies to cloud-connected hyperconverged deployments without external storage. L2 applies to disaggregated deployments or hyperconverged deployments with external storage. An Azure Local OEM license with external storage uses the listed 10/core/month special rate. L3 applies to disconnected operations with a locally hosted control plane. Microsoft does not publish an L3 host fee, so the calculator requires a user-provided planning rate or account-specific quote. Azure Local host fees and the Windows Server subscription have a free trial for the first 60 days after registration. See the
+      <a href="https://azure.microsoft.com/en-us/pricing/details/azure-local/#pricing" target="_blank">Azure Local pricing page</a>,
+      <a href="https://learn.microsoft.com/en-us/azure/azure-local/overview/disaggregated-overview?view=azloc-2606" target="_blank">disaggregated deployment overview</a> and
+      <a href="https://learn.microsoft.com/en-us/azure/azure-local/manage/disconnected-operations-overview?view=azloc-2606" target="_blank">disconnected operations overview</a>.
+      Fixed Azure rates are treated as values in the selected calculator currency. Currency selection does not perform foreign exchange conversion.
+    </p>
+    <p>
       <strong>Hybrid Benefit Disclaimer:</strong><br>
-      The Azure Local Host fee (10/core) and Windows Server fee (23.30/core) can be waived if you qualify for Azure Hybrid Benefit under an Enterprise Agreement (EA) or a Cloud Solution Provider (CSP) subscription. MPSA or OEM + SA is not supported, and Hybrid Benefit is not defined for Open Value. Consult the
+      Azure Hybrid Benefit can waive the Azure Local host fee only for L1 cloud-connected hyperconverged deployments without external storage. It does not waive the L2 or L3 host fee. Eligible customers can exchange Windows Server Datacenter core licenses with active Software Assurance through Enterprise Agreement or CSP to waive the L1 host fee and Windows Server subscription. Consult the
       <a href="https://www.microsoft.com/licensing/terms/productoffering/MicrosoftAzure/EAEAS" target="_blank">Microsoft Product Terms (EA/CSP)</a>,
       <a href="https://www.microsoft.com/licensing/terms/productoffering/WindowsServerStandardDatacenterEssentials/SS" target="_blank">Microsoft Product Terms for Windows Server</a>, and
       <a href="https://learn.microsoft.com/en-us/windows-server/get-started/azure-hybrid-benefit?tabs=azure-local#getting-azure-hybrid-benefit" target="_blank">Azure Hybrid Benefit for Windows Server</a>
@@ -357,15 +382,41 @@
   function sym() { return currencySymbols[$("pricingV2_currencySelect").value] || ""; }
   function fmt(n) { return sym() + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+  /* ---- deployment model ---- */
+  const deploymentModels = {
+    l1: { label: "L1: Hyperconverged without external storage", rate: 10 },
+    l2: { label: "L2: Disaggregated or external storage", rate: 20.10 },
+    "l2-oem": { label: "L2: OEM license with external storage", rate: 10 },
+    l3: { label: "L3: Disconnected operations", rate: null }
+  };
+
+  function updateDeploymentFields() {
+    const model = $("pricingV2_deploymentModel").value;
+    const isL1 = model === "l1";
+    const isL2 = model === "l2" || model === "l2-oem";
+    const hostWaiver = $("pricingV2_waiveHostFee");
+    const nodes = $("pricingV2_nodes");
+
+    $("pricingV2_l3RateContainer").style.display = model === "l3" ? "flex" : "none";
+    hostWaiver.disabled = !isL1;
+    if (!isL1) hostWaiver.checked = false;
+
+    nodes.max = isL2 ? "64" : "16";
+    if (+nodes.value > +nodes.max) nodes.value = nodes.max;
+  }
+
   /* ---- checkbox linking ---- */
   $("pricingV2_customLicenseChk").addEventListener("change", function () {
     $("pricingV2_waiveWindowsLicense").checked = this.checked;
     $("pricingV2_customLicenseContainer").style.display = this.checked ? "block" : "none";
   });
   $("pricingV2_waiveWindowsLicense").addEventListener("change", function () {
-    $("pricingV2_customLicenseChk").checked = this.checked;
-    $("pricingV2_customLicenseContainer").style.display = this.checked ? "block" : "none";
+    if (!this.checked) {
+      $("pricingV2_customLicenseChk").checked = false;
+      $("pricingV2_customLicenseContainer").style.display = "none";
+    }
   });
+  $("pricingV2_deploymentModel").addEventListener("change", updateDeploymentFields);
 
   /* ---- SQL price lookup (per vCore / month) ---- */
   const sqlPrices = {
@@ -383,6 +434,7 @@
   let costChart = null, oneTimeBreakdownChart = null, costBreakdownChart = null;
 
   const num = el => +(el.value) || 0;
+  updateDeploymentFields();
 
   /* ================================================================
      MAIN CALCULATION
@@ -398,13 +450,27 @@
 
     const coresPerNode = num($("pricingV2_coresPerNode"));
     const totalCores   = nodes * coresPerNode;
-    const hostFee      = $("pricingV2_waiveHostFee").checked ? 0 : totalCores * 10;
+    const deploymentModel = $("pricingV2_deploymentModel").value;
+    const deployment = deploymentModels[deploymentModel];
+    const l3RateInput = $("pricingV2_l3HostRate");
+    const hostRate = deploymentModel === "l3" ? num(l3RateInput) : deployment.rate;
+    if (deploymentModel === "l3" && hostRate <= 0) {
+      alert("Enter an L3 host fee per physical core per month before calculating.");
+      l3RateInput.focus();
+      return;
+    }
+    const hostFeeWaived = deploymentModel === "l1" && $("pricingV2_waiveHostFee").checked;
+    const hostFee = hostFeeWaived ? 0 : totalCores * hostRate;
 
     let winMonthly = 0, winOneTime = 0;
+    let winLicenseMode = "default";
     if ($("pricingV2_customLicenseChk").checked) {
+      winLicenseMode = "custom";
       winMonthly = num($("pricingV2_customWinMonthly")) * nodes;
       winOneTime = num($("pricingV2_customWinOneTime"))  * nodes;
-    } else if (!$("pricingV2_waiveWindowsLicense").checked) {
+    } else if ($("pricingV2_waiveWindowsLicense").checked) {
+      winLicenseMode = "waived";
+    } else {
       winMonthly = totalCores * 23.30;
     }
 
@@ -438,15 +504,18 @@
 
     const oneTimeTotal = hwCost + winOneTime + thirdOneTime;
     const monthlyTotal = hostFee + winMonthly + thirdMonthly + avdCost + sqlCost;
-    const yearlyTotal  = oneTimeTotal + monthlyTotal * 12;
-    const threeYearTotal = oneTimeTotal + monthlyTotal * 36;
+    const trialApplied = $("pricingV2_applyTrial").checked;
+    const trialEligibleMonthly = hostFee + (winLicenseMode === "default" ? winMonthly : 0);
+    const trialSavings = trialApplied ? trialEligibleMonthly * 2 : 0;
+    const yearlyTotal  = oneTimeTotal + monthlyTotal * 12 - trialSavings;
+    const threeYearTotal = oneTimeTotal + monthlyTotal * 36 - trialSavings;
 
     /* ---- quick result ---- */
     const rb = $("pricingV2_resultBox");
     rb.style.display = "block";
     rb.innerHTML =
       "<strong>Total One-Time Cost:</strong> " + fmt(oneTimeTotal) + "<br>" +
-      "<strong>Total Monthly Cost:</strong> " + fmt(monthlyTotal) + "<br>" +
+      "<strong>Recurring Monthly Cost After Trial:</strong> " + fmt(monthlyTotal) + "<br>" +
       "<strong>Estimated 1-Year Total:</strong> " + fmt(yearlyTotal) + "<br>" +
       "<strong>Estimated 3-Year Total:</strong> " + fmt(threeYearTotal);
 
@@ -461,15 +530,16 @@
       nodes, nodeUnit, nodesCost,
       switches, switchUnit, switchCost, hwCost,
       coresPerNode, totalCores,
-      hostFeeWaived: $("pricingV2_waiveHostFee").checked,
-      hostFee,
-      winLicenseMode: $("pricingV2_customLicenseChk").checked ? "custom" : ($("pricingV2_waiveWindowsLicense").checked ? "waived" : "default"),
+      deploymentModel, deploymentLabel: deployment.label, hostRate,
+      hostFeeWaived, hostFee,
+      winLicenseMode,
       winMonthly, winOneTime,
       backupOTC, backupMonth, logsOTC, logsMonth,
       installOTC, installMonth, partnerOTC, partnerMonth,
       otherOTC, otherMonth, thirdOneTime, thirdMonthly,
       avdVCPUs, avdHours, avdCost,
       sqlVcores, sqlHours, sqlTier, sqlLic, sqlTerm, sqlMonthlyRate, sqlHourlyRate, sqlCost,
+      trialApplied, trialEligibleMonthly, trialSavings,
       oneTimeTotal, monthlyTotal, yearlyTotal, threeYearTotal
     });
 
@@ -500,8 +570,10 @@
     total("Total Hardware", fmt(d.hwCost));
 
     sec("Licensing");
+    row("Azure Local Deployment Model", d.deploymentLabel, d.deploymentModel.toUpperCase());
     row("Total Physical Cores", d.nodes + " nodes x " + d.coresPerNode + " cores/node", d.totalCores + " cores");
-    row("Azure Local Host Fee (monthly)", d.hostFeeWaived ? "Waived" : d.totalCores + " cores x " + c + "10/core", fmt(d.hostFee));
+    row("Azure Local Host Rate", d.deploymentModel === "l3" ? "User-provided rate" : "Published rate", fmt(d.hostRate) + "/core/month");
+    row("Azure Local Host Fee (monthly)", d.hostFeeWaived ? "Waived through Azure Hybrid Benefit" : d.totalCores + " cores x " + fmt(d.hostRate) + "/core", fmt(d.hostFee));
 
     if (d.winLicenseMode === "custom") {
       row("Windows License (monthly)", "Custom: " + fmt(d.winMonthly / d.nodes) + "/node x " + d.nodes + " nodes", fmt(d.winMonthly));
@@ -511,6 +583,8 @@
     } else {
       row("Windows License (monthly)", d.totalCores + " cores x " + c + "23.30/core", fmt(d.winMonthly));
     }
+
+    row("Free 60-Day Trial", d.trialApplied ? "Applied to eligible host and Windows subscription fees" : "Not applied", d.trialSavings > 0 ? "-" + fmt(d.trialSavings) : fmt(0));
 
     sec("Related / Third-Party");
     if (d.backupOTC || d.backupMonth)   { row("Backup (OTC)", "User-defined", fmt(d.backupOTC));   row("Backup (monthly)", "User-defined", fmt(d.backupMonth)); }
@@ -528,7 +602,7 @@
 
     sec("Totals");
     total("Total One-Time Cost", fmt(d.oneTimeTotal));
-    total("Total Monthly Cost", fmt(d.monthlyTotal));
+    total("Recurring Monthly Cost After Trial", fmt(d.monthlyTotal));
     total("Estimated 1-Year Total", fmt(d.yearlyTotal));
     total("Estimated 3-Year Total", fmt(d.threeYearTotal));
 
@@ -561,7 +635,7 @@
     const cur = $("pricingV2_currencySelect").value;
     const cfg = {
       type: "bar",
-      data: { labels: ["One-Time", "Monthly", "1-Year Est."], datasets: [{ data: [oneT, monthT, yearT], backgroundColor: ["rgba(0,122,255,.75)", "rgba(88,86,214,.75)", "rgba(52,199,89,.75)"] }] },
+      data: { labels: ["One-Time", "Monthly After Trial", "1-Year Est."], datasets: [{ data: [oneT, monthT, yearT], backgroundColor: ["rgba(0,122,255,.75)", "rgba(88,86,214,.75)", "rgba(52,199,89,.75)"] }] },
       options: chartOpts("Cost Summary", cur)
     };
     if (costChart) costChart.destroy();

@@ -67,7 +67,11 @@ Estimates the total cost of ownership (TCO) for an Azure Local deployment, inclu
 - Multi-currency support: EUR, USD, GBP, CHF
 - **Infrastructure**: nodes and switches (one-time cost)
 - **Licensing**:
-  - Azure Local Host Fee (10/core/month), waivable via Azure Hybrid Benefit
+  - Azure Local deployment models: L1 hyperconverged without external storage, L2 disaggregated or external storage and L3 disconnected operations
+  - Azure Local Host Fee: 10/core/month for L1, 20.10/core/month for L2 and a user-provided rate for L3
+  - OEM license with external storage pricing at 10/core/month
+  - Azure Hybrid Benefit host fee waiver restricted to eligible L1 deployments
+  - Free 60-day trial applied to eligible term estimates
   - Windows Server Datacenter Fee (23.30/core/month), waivable via Hybrid Benefit
   - Custom Windows license pricing per node (monthly + one-time)
 - **Related costs** (one-time and monthly per category):
