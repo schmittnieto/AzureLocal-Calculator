@@ -69,6 +69,7 @@
 
     #pricingV2_calcRoot .disclaimer{font-size:.8em;margin-top:20px;text-align:left;line-height:1.6}
     #pricingV2_calcRoot .disclaimer a{color:#007aff;text-decoration:none}
+    #pricingV2_calcRoot .warning{color:#cc3300;font-weight:600}
     #pricingV2_calcRoot .disclaimer a:hover{text-decoration:underline}
 
     @media print{
@@ -123,7 +124,8 @@
         <label for="pricingV2_deploymentModel">Azure Local Deployment Model</label>
         <select id="pricingV2_deploymentModel">
           <option value="l1">L1: Hyperconverged without external storage (10/core/month)</option>
-          <option value="l2">L2: Disaggregated or external storage (20.10/core/month)</option>
+          <option value="l2-disagg">L2: Disaggregated with SAN storage (20.10/core/month, no Hybrid Benefit)</option>
+          <option value="l2">L2: Hyperconverged with external storage (20.10/core/month)</option>
           <option value="l2-oem">L2: OEM license with external storage (10/core/month)</option>
           <option value="l3">L3: Disconnected operations (user-provided rate)</option>
         </select>
@@ -142,6 +144,7 @@
         <input type="checkbox" id="pricingV2_waiveHostFee">
         <label for="pricingV2_waiveHostFee">Apply Azure Hybrid Benefit to the L1 Host Fee (saves 10/core/month)</label>
       </div>
+      <p id="pricingV2_ahbNote" class="warning" style="display:none;font-size:.82em;margin:0 0 10px"></p>
       <div class="chk-row">
         <input type="checkbox" id="pricingV2_waiveWindowsLicense">
         <label for="pricingV2_waiveWindowsLicense">Waive Windows Server License Fee (saves 23.30/core/month)</label>
@@ -334,14 +337,14 @@
     </p>
     <ul>
       <li><strong>Infrastructure Price:</strong> Node and switch costs (one-time).</li>
-      <li><strong>License Price:</strong> L1 host fee (10/core), L2 host fee (20.10/core), user-provided L3 host fee, Windows Server fee (23.30/core) or custom Windows pricing.</li>
+      <li><strong>License Price:</strong> L1 host fee (10/core), L2 host fee for disaggregated or external storage (20.10/core), L2 OEM host fee (10/core), user-provided L3 host fee, Windows Server fee (23.30/core) or custom Windows pricing.</li>
       <li><strong>Related Costs:</strong> Additional one-time and monthly costs for external services (e.g., Backup, security software).</li>
       <li><strong>Service Price:</strong> Azure Virtual Desktop (AVD) and SQL Managed Instance (SQLmi) usage costs (monthly).</li>
     </ul>
     <p>Actual costs may vary depending on vendor quotes, hardware configurations, and licensing agreements.</p>
     <p>
       <strong>Azure Local Deployment Model Disclaimer:</strong><br>
-      L1 applies to cloud-connected hyperconverged deployments without external storage. L2 applies to disaggregated deployments or hyperconverged deployments with external storage. An Azure Local OEM license with external storage uses the listed 10/core/month special rate. L3 applies to disconnected operations with a locally hosted control plane. Microsoft does not publish an L3 host fee, so the calculator requires a user-provided planning rate or account-specific quote. Azure Local host fees and the Windows Server subscription have a free trial for the first 60 days after registration. See the
+      L1 applies to cloud-connected hyperconverged deployments without external storage. L2 applies to disaggregated deployments with SAN storage (up to 64 machines) and to hyperconverged deployments with external storage. Both use the 20.10/core/month host fee. An Azure Local OEM license with external storage uses the listed 10/core/month special rate. L3 applies to disconnected operations with a locally hosted control plane. Microsoft does not publish an L3 host fee, so the calculator requires a user-provided planning rate or account-specific quote. Azure Local host fees and the Windows Server subscription have a free trial for the first 60 days after registration. See the
       <a href="https://azure.microsoft.com/en-us/pricing/details/azure-local/#pricing" target="_blank">Azure Local pricing page</a>,
       <a href="https://learn.microsoft.com/en-us/azure/azure-local/overview/disaggregated-overview?view=azloc-2606" target="_blank">disaggregated deployment overview</a> and
       <a href="https://learn.microsoft.com/en-us/azure/azure-local/manage/disconnected-operations-overview?view=azloc-2606" target="_blank">disconnected operations overview</a>.
@@ -349,7 +352,7 @@
     </p>
     <p>
       <strong>Hybrid Benefit Disclaimer:</strong><br>
-      Azure Hybrid Benefit can waive the Azure Local host fee only for L1 cloud-connected hyperconverged deployments without external storage. It does not waive the L2 or L3 host fee. Eligible customers can exchange Windows Server Datacenter core licenses with active Software Assurance through Enterprise Agreement or CSP to waive the L1 host fee and Windows Server subscription. Consult the
+      Azure Hybrid Benefit can waive the Azure Local host fee only for L1 cloud-connected hyperconverged deployments without external storage. It does not waive the L2 host fee, including disaggregated deployments with SAN storage, or the L3 host fee. Eligible customers can exchange Windows Server Datacenter core licenses with active Software Assurance through Enterprise Agreement or CSP to waive the L1 host fee and Windows Server subscription. Consult the
       <a href="https://www.microsoft.com/licensing/terms/productoffering/MicrosoftAzure/EAEAS" target="_blank">Microsoft Product Terms (EA/CSP)</a>,
       <a href="https://www.microsoft.com/licensing/terms/productoffering/WindowsServerStandardDatacenterEssentials/SS" target="_blank">Microsoft Product Terms for Windows Server</a>, and
       <a href="https://learn.microsoft.com/en-us/windows-server/get-started/azure-hybrid-benefit?tabs=azure-local#getting-azure-hybrid-benefit" target="_blank">Azure Hybrid Benefit for Windows Server</a>
@@ -390,7 +393,8 @@
   /* ---- deployment model ---- */
   const deploymentModels = {
     l1: { label: "L1: Hyperconverged without external storage", rate: 10 },
-    l2: { label: "L2: Disaggregated or external storage", rate: 20.10 },
+    "l2-disagg": { label: "L2: Disaggregated with SAN storage", rate: 20.10 },
+    l2: { label: "L2: Hyperconverged with external storage", rate: 20.10 },
     "l2-oem": { label: "L2: OEM license with external storage", rate: 10 },
     l3: { label: "L3: Disconnected operations", rate: null }
   };
@@ -398,13 +402,16 @@
   function updateDeploymentFields() {
     const model = $("pricingV2_deploymentModel").value;
     const isL1 = model === "l1";
-    const isL2 = model === "l2" || model === "l2-oem";
+    const isL2 = model === "l2" || model === "l2-disagg" || model === "l2-oem";
     const hostWaiver = $("pricingV2_waiveHostFee");
     const nodes = $("pricingV2_nodes");
 
     $("pricingV2_l3RateContainer").style.display = model === "l3" ? "flex" : "none";
     hostWaiver.disabled = !isL1;
     if (!isL1) hostWaiver.checked = false;
+    const ahbNote = $("pricingV2_ahbNote");
+    ahbNote.textContent = isL1 ? "" : "Azure Hybrid Benefit is not available for " + deploymentModels[model].label + ". The host fee always applies.";
+    ahbNote.style.display = isL1 ? "none" : "block";
 
     nodes.max = isL2 ? "64" : "16";
     if (+nodes.value > +nodes.max) nodes.value = nodes.max;
@@ -578,7 +585,7 @@
     row("Azure Local Deployment Model", d.deploymentLabel, d.deploymentModel.toUpperCase());
     row("Total Physical Cores", d.nodes + " nodes x " + d.coresPerNode + " cores/node", d.totalCores + " cores");
     row("Azure Local Host Rate", d.deploymentModel === "l3" ? "User-provided rate" : "Published rate", fmt(d.hostRate) + "/core/month");
-    row("Azure Local Host Fee (monthly)", d.hostFeeWaived ? "Waived through Azure Hybrid Benefit" : d.totalCores + " cores x " + fmt(d.hostRate) + "/core", fmt(d.hostFee));
+    row("Azure Local Host Fee (monthly)", d.hostFeeWaived ? "Waived through Azure Hybrid Benefit" : d.totalCores + " cores x " + fmt(d.hostRate) + "/core" + (d.deploymentModel === "l1" ? "" : " (no Azure Hybrid Benefit)"), fmt(d.hostFee));
 
     if (d.winLicenseMode === "custom") {
       row("Windows License (monthly)", "Custom: " + fmt(d.winMonthly / d.nodes) + "/node x " + d.nodes + " nodes", fmt(d.winMonthly));
@@ -1026,7 +1033,7 @@
 
     let model = "l1";
     if (cfg.scenario === "disconnected" || cfg.clusterType === "aldo-mgmt") model = "l3";
-    else if (cfg.clusterType === "disaggregated") model = "l2";
+    else if (cfg.clusterType === "disaggregated") model = "l2-disagg";
     $("pricingV2_deploymentModel").value = model;
     updateDeploymentFields();
     applied.push(["Deployment Model", deploymentModels[model].label]);

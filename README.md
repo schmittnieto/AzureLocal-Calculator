@@ -67,10 +67,10 @@ Estimates the total cost of ownership (TCO) for an Azure Local deployment, inclu
 - Multi-currency support: EUR, USD, GBP, CHF
 - **Infrastructure**: nodes and switches (one-time cost)
 - **Licensing**:
-  - Azure Local deployment models: L1 hyperconverged without external storage, L2 disaggregated or external storage and L3 disconnected operations
-  - Azure Local Host Fee: 10/core/month for L1, 20.10/core/month for L2 and a user-provided rate for L3
+  - Azure Local deployment models: L1 hyperconverged without external storage, L2 disaggregated with SAN storage, L2 hyperconverged with external storage and L3 disconnected operations
+  - Azure Local Host Fee: 10/core/month for L1, 20.10/core/month for both L2 variants and a user-provided rate for L3
   - OEM license with external storage pricing at 10/core/month
-  - Azure Hybrid Benefit host fee waiver restricted to eligible L1 deployments
+  - Azure Hybrid Benefit host fee waiver restricted to eligible L1 deployments (not available for disaggregated or any other L2 or L3 deployment)
   - Free 60-day trial applied to eligible term estimates
   - Windows Server Datacenter Fee (23.30/core/month), waivable via Hybrid Benefit
   - Custom Windows license pricing per node (monthly + one-time)
@@ -102,7 +102,7 @@ The file is read locally in the browser and is never uploaded. After the import,
 |------------|---------------------------|
 | Storage V2 | Node count (Single Node when 1), capacity drives per node and drive size, resiliency (two-way or three-way mirror), target effective storage from the workload total including future growth |
 | CPU V2 | Total workload vCPUs including future growth (as VMs x vCPUs), vCPU to core ratio, node count, sockets, and the ODIN CPU as a selectable model in the "I know my CPU" mode |
-| Pricing V2 | Deployment model (L1, L2 for disaggregated, L3 for disconnected), node count, physical cores per node, switch count when the design defines it, AVD vCPUs |
+| Pricing V2 | Deployment model (L1, L2 disaggregated with SAN storage, L3 for disconnected), node count, physical cores per node, switch count when the design defines it, AVD vCPUs |
 
 Limitations:
 - Tiered ODIN layouts are imported as their capacity drives only, because the Storage Calculator models full-flash storage.
