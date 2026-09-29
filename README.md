@@ -89,6 +89,28 @@ Estimates the total cost of ownership (TCO) for an Azure Local deployment, inclu
 
 ---
 
+## Import from ODIN
+
+All three V2 calculators include an **Import from ODIN** button that loads a configuration exported from [ODIN for Azure Local](https://azure.github.io/odinforazurelocal/). Both ODIN export formats are supported:
+
+- **Sizer** "Export JSON" file (`{ _meta, data }` or the bare `data` object)
+- **Designer** "Export Configuration" file (`{ version, exportedAt, state }`). Hardware and workload data is only available when the design was started from the Sizer.
+
+The file is read locally in the browser and is never uploaded. After the import, the calculator fills in the matching fields, recalculates and shows a summary of what was applied and what could not be mapped.
+
+| Calculator | Fields imported from ODIN |
+|------------|---------------------------|
+| Storage V2 | Node count (Single Node when 1), capacity drives per node and drive size, resiliency (two-way or three-way mirror), target effective storage from the workload total including future growth |
+| CPU V2 | Total workload vCPUs including future growth (as VMs x vCPUs), vCPU to core ratio, node count, sockets, and the ODIN CPU as a selectable model in the "I know my CPU" mode |
+| Pricing V2 | Deployment model (L1, L2 for disaggregated, L3 for disconnected), node count, physical cores per node, switch count when the design defines it, AVD vCPUs |
+
+Limitations:
+- Tiered ODIN layouts are imported as their capacity drives only, because the Storage Calculator models full-flash storage.
+- Prices (nodes, switches, related costs) are not part of ODIN exports and must be entered manually.
+- For L3 (disconnected operations) the host fee must be entered before the pricing is calculated.
+
+---
+
 ## Repository Structure
 
 ```
