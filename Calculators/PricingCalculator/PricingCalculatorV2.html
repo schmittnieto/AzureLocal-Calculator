@@ -871,18 +871,38 @@
     return { vcpus: v, memory: m, storage: s, vms: vms };
   }
 
-  function odinSwitches(clusterType, st) {
+  /* Mirrors the ODIN Sizer network model (infrastructure power estimate):
+     per rack 2 ToR + 1 BMC; rack-aware uses 2 racks; disaggregated adds
+     2 FC switches per rack for FC SAN plus the spine switches; a single node
+     only has a BMC switch. Designer ToR choices override the defaults. */
+  function odinNetwork(clusterType, nodes, st) {
+    var tor, bmc, fc = 0, spine = 0;
+    var torChoice = st.torSwitchCount === "single" ? 1 : (st.torSwitchCount === "dual" ? 2 : null);
     if (clusterType === "disaggregated") {
-      var racks = odinInt(st.disaggRackCount, 0);
-      if (racks > 0) return racks * 2 + odinInt(st.disaggSpineCount, 2);
-      return null;
+      var racks = Math.max(odinInt(st.disaggRackCount, 2), 1);
+      tor = racks * 2; bmc = racks;
+      fc = (st.disaggStorageType || "fc_san") === "fc_san" ? racks * 2 : 0;
+      spine = Math.max(odinInt(st.disaggSpineCount, 2), 0);
+    } else if (clusterType === "rack-aware") {
+      tor = 2 * (odinInt(st.rackAwareTorsPerRoom, 0) || 2); bmc = 2;
+    } else if (nodes === 1) {
+      tor = torChoice || 0; bmc = 1;
+    } else {
+      tor = torChoice || 2; bmc = 1;
     }
-    if (clusterType === "rack-aware" && odinInt(st.rackAwareTorsPerRoom, 0) > 0) {
-      return odinInt(st.rackAwareTorsPerRoom, 0) * 2;
-    }
-    if (st.torSwitchCount === "single") return 1;
-    if (st.torSwitchCount === "dual") return 2;
-    return null;
+    var parts = [];
+    if (tor) parts.push(tor + " ToR");
+    parts.push(bmc + " BMC");
+    if (fc) parts.push(fc + " FC");
+    if (spine) parts.push(spine + " Spine");
+    return { total: tor + bmc + fc + spine, detail: parts.join(" + ") };
+  }
+
+  /* Mirrors getHostCpuReservedCores() in ODIN sizer.js (cores per node). */
+  function odinHostReservedCores(clusterType, totalCores) {
+    if (clusterType === "aldo-mgmt") return Math.max(Math.ceil(0.20 * totalCores), 2);
+    if (clusterType === "disaggregated") return Math.max(Math.ceil(0.10 * totalCores), 1);
+    return Math.max(Math.ceil(0.10 * totalCores), 2);
   }
 
   function parseOdinConfig(text) {
@@ -893,7 +913,7 @@
     var r = {
       source: null, nodes: null, clusterType: null, scenario: "connected", resiliency: null,
       cpu: null, vcpuRatio: null, growthPct: 0, growthYears: 1, growthFactor: 1,
-      disks: null, workloadCount: 0, totals: null, avdVcpus: 0, vmEquivalents: 0, switches: null
+      disks: null, workloadCount: 0, totals: null, avdVcpus: 0, vmEquivalents: 0, network: null, hostReservedCores: null
     };
 
     if (json.state && typeof json.state === "object") {
@@ -907,7 +927,7 @@
         : (st.scale === "rack_aware" ? "rack-aware" : "standard")));
       r.nodes = odinInt(st.nodes, null) || (hw ? odinInt(hw.nodeCount, null) : null);
       if (r.nodes === 1 && r.clusterType === "standard") r.clusterType = "single";
-      r.switches = odinSwitches(r.clusterType, st);
+      r.network = odinNetwork(r.clusterType, r.nodes, st);
       if (hw) {
         r.resiliency = hw.resiliency || null;
         if (hw.cpu && odinInt(hw.cpu.coresPerSocket, 0) > 0) {
@@ -930,7 +950,8 @@
             cacheTB: dc.cache ? odinNum(dc.cache.sizeGB, 0) / 1024 : 0
           };
         }
-        var sw = Array.isArray(st.sizerWorkloads) ? st.sizerWorkloads : [];
+        var sw = Array.isArray(st.sizerWorkloads) ? st.sizerWorkloads
+          : (st.sizerWorkloads && typeof st.sizerWorkloads === "object" ? Object.keys(st.sizerWorkloads).map(function(k) { return st.sizerWorkloads[k]; }) : []);
         var t = { vcpus: 0, memory: 0, storage: 0 };
         sw.forEach(function(w) {
           if (!w || typeof w !== "object") return;
@@ -963,19 +984,19 @@
       r.vcpuRatio = odinInt(d.vcpuRatio, null);
       r.growthPct = odinInt(d.futureGrowth, 0);
       r.growthYears = d.sizeFor5YrGrowth === true ? 5 : 1;
-      var tiered = d.storageConfig && d.storageConfig !== "all-flash" && odinInt(d.cacheDiskCount, 0) > 0;
+      var tiered = d.storageConfig === "mixed-flash" || d.storageConfig === "hybrid";
       if (tiered) {
         r.disks = {
           isTiered: true,
-          capacityCount: odinInt(d.tieredCapacityDiskCount, 0), capacityTB: odinNum(d.tieredCapacityDiskSize, 0),
-          cacheCount: odinInt(d.cacheDiskCount, 0), cacheTB: odinNum(d.cacheDiskSize, 0)
+          capacityCount: odinInt(d.tieredCapacityDiskCount, 4), capacityTB: odinNum(d.tieredCapacityDiskSize, 3.84),
+          cacheCount: odinInt(d.cacheDiskCount, 2), cacheTB: odinNum(d.cacheDiskSize, 1.92)
         };
       } else if (odinInt(d.capacityDiskCount, 0) > 0) {
         r.disks = { isTiered: false, capacityCount: odinInt(d.capacityDiskCount, 0), capacityTB: odinNum(d.capacityDiskSize, 0), cacheCount: 0, cacheTB: 0 };
       }
-      if (r.clusterType === "disaggregated") {
-        r.switches = odinSwitches("disaggregated", { disaggRackCount: d.disaggRackCount, disaggSpineCount: d.disaggSpineCount });
-      }
+      r.network = odinNetwork(r.clusterType, r.nodes, {
+        disaggRackCount: d.disaggRackCount, disaggSpineCount: d.disaggSpineCount, disaggStorageType: d.disaggStorageType
+      });
       var wl = Array.isArray(d.workloads) ? d.workloads : [];
       var tt = { vcpus: 0, memory: 0, storage: 0 };
       wl.forEach(function(w) {
@@ -991,10 +1012,15 @@
 
     r.growthFactor = Math.pow(1 + r.growthPct / 100, r.growthYears);
     if (!r.nodes || r.nodes < 1) r.nodes = null;
+    if (r.cpu) r.hostReservedCores = odinHostReservedCores(r.clusterType, r.cpu.coresPerSocket * r.cpu.sockets);
+    if (r.cpu && (!r.cpu.generation || r.cpu.generation === "Unknown")) {
+      r.cpu.generation = r.cpu.manufacturer === "amd" ? "AMD CPU" : (r.cpu.manufacturer ? "Intel CPU" : "CPU");
+    }
     return r;
   }
 
-  /* Opens a file picker, parses the chosen ODIN file and hands it to onLoad. */
+  /* Opens a file picker, parses the chosen ODIN file and hands it to onLoad
+     together with the raw text (used to share the import). */
   function pickOdinFile(input, onLoad, onError) {
     input.value = "";
     input.onchange = function() {
@@ -1003,8 +1029,10 @@
       if (file.size > 5 * 1024 * 1024) { onError("The file is larger than 5 MB."); return; }
       var reader = new FileReader();
       reader.onload = function() {
-        try { onLoad(parseOdinConfig(String(reader.result)), file.name); }
-        catch (e) { onError(e.message || String(e)); }
+        var text = String(reader.result), cfg;
+        try { cfg = parseOdinConfig(text); }
+        catch (e) { onError(e.message || String(e)); return; }
+        onLoad(cfg, file.name, text);
       };
       reader.onerror = function() { onError("The file could not be read."); };
       reader.readAsText(file);
@@ -1028,6 +1056,39 @@
     box.innerHTML = h;
     box.style.display = "block";
   }
+
+  /* Shares one ODIN import with every calculator: the others on the same
+     page (or in other blog tabs) apply it right away, and it is kept for the
+     browser session so the other calculator pages load it as well. */
+  var ODIN_SHARE_KEY = "azureLocalCalculator.odinImport";
+  var ODIN_SHARE_EVENT = "azurelocal-calculator-odin-import";
+  var odinChannel = null;
+  try { if (typeof BroadcastChannel === "function") odinChannel = new BroadcastChannel(ODIN_SHARE_EVENT); } catch (e) {}
+
+  function shareOdinImport(text, fileName, sourceId) {
+    var msg = { text: text, fileName: fileName, source: sourceId };
+    try { sessionStorage.setItem(ODIN_SHARE_KEY, JSON.stringify(msg)); } catch (e) {}
+    try {
+      if (odinChannel) odinChannel.postMessage(msg);
+      else window.dispatchEvent(new CustomEvent(ODIN_SHARE_EVENT, { detail: msg }));
+    } catch (e) {}
+  }
+
+  /* Calls apply(cfg, label) for imports made in another calculator and, on
+     page load, for the import stored earlier in this browser session. */
+  function listenOdinImport(sourceId, apply) {
+    function handle(msg, suffix) {
+      if (!msg || typeof msg.text !== "string" || msg.source === sourceId) return;
+      try { apply(parseOdinConfig(msg.text), String(msg.fileName || "ODIN export") + suffix); }
+      catch (e) { if (window.console) console.warn("Shared ODIN import skipped:", e); }
+    }
+    if (odinChannel) odinChannel.addEventListener("message", function(ev) { handle(ev.data, " (shared from another calculator)"); });
+    else window.addEventListener(ODIN_SHARE_EVENT, function(ev) { handle(ev.detail, " (shared from another calculator)"); });
+    var saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(ODIN_SHARE_KEY) || "null"); } catch (e) {}
+    if (saved && typeof saved === "object") { saved.source = null; handle(saved, " (restored from this browser session)"); }
+  }
+
   function applyOdinConfig(cfg, fileName) {
     const applied = [], notes = [];
 
@@ -1051,9 +1112,9 @@
     } else {
       notes.push("The file has no CPU data. Physical cores per node were not changed.");
     }
-    if (cfg.switches !== null) {
-      $("pricingV2_switches").value = cfg.switches;
-      applied.push(["Switches", String(cfg.switches)]);
+    if (cfg.network) {
+      $("pricingV2_switches").value = cfg.network.total;
+      applied.push(["Switches", cfg.network.total + " (" + cfg.network.detail + ", ODIN network model)"]);
     }
     if (cfg.avdVcpus > 0) {
       $("pricingV2_avdVCPUs").value = Math.ceil(cfg.avdVcpus);
@@ -1069,12 +1130,16 @@
   }
 
   $("pricingV2_importOdinBtn").addEventListener("click", function () {
-    pickOdinFile($("pricingV2_odinFile"), applyOdinConfig, msg => alert("ODIN import failed: " + msg));
+    pickOdinFile($("pricingV2_odinFile"), (cfg, fileName, text) => {
+      applyOdinConfig(cfg, fileName);
+      shareOdinImport(text, fileName, "pricing");
+    }, msg => alert("ODIN import failed: " + msg));
   });
 
   /* ---- events ---- */
   $("pricingV2_calcBtn").addEventListener("click", calculate);
   $("pricingV2_exportPdfBtn").addEventListener("click", exportPdf);
+  listenOdinImport("pricing", applyOdinConfig);
 })();
 </script>
 </body>

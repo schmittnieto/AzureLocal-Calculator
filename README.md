@@ -98,14 +98,23 @@ All three V2 calculators include an **Import from ODIN** button that loads a con
 
 The file is read locally in the browser and is never uploaded. After the import, the calculator fills in the matching fields, recalculates and shows a summary of what was applied and what could not be mapped.
 
+All cluster types ODIN exports are supported: Single Node, Hyperconverged, Rack Aware, Disaggregated Storage and Disconnected Operations (management cluster).
+
+**One import for all calculators:** a configuration imported in one calculator is applied to the other calculators as well, both on the same page and in other open tabs of the site. It is also kept for the browser session, so the other calculator pages load it automatically when they are opened. Closing the browser tab clears it.
+
 | Calculator | Fields imported from ODIN |
 |------------|---------------------------|
-| Storage V2 | Node count (Single Node when 1), capacity drives per node and drive size, resiliency (two-way or three-way mirror), target effective storage from the workload total including future growth |
-| CPU V2 | Total workload vCPUs including future growth (as VMs x vCPUs), vCPU to core ratio, node count, sockets, and the ODIN CPU as a selectable model in the "I know my CPU" mode |
-| Pricing V2 | Deployment model (L1, L2 disaggregated with SAN storage, L3 for disconnected), node count, physical cores per node, switch count when the design defines it, AVD vCPUs |
+| Storage V2 | Node count (Single Node when 1), capacity drives per node and drive size, resiliency (Simple, two-way, three-way or four-way mirror), target effective storage from the workload total including future growth |
+| CPU V2 | Total workload vCPUs including future growth (as VMs x vCPUs), vCPU to core ratio, node count, sockets, management overhead per node (ODIN host core reservation), and the ODIN CPU as a selectable model in the "I know my CPU" mode |
+| Pricing V2 | Deployment model (L1, L2 disaggregated with SAN storage, L3 for disconnected), node count, physical cores per node, switch count, AVD vCPUs |
+
+The switch count follows the ODIN Sizer network model: 2 ToR and 1 BMC switch per rack (Rack Aware uses 2 racks), a single BMC switch for Single Node, and for Disaggregated Storage 2 ToR and 1 BMC per rack plus 2 FC switches per rack for FC SAN and the spine switches. When a Designer file defines the ToR switch count, that value is used.
+
+The Simple and Four-Way Mirror resiliency options (single node and rack aware clusters) only appear in the Storage Calculator when an imported configuration uses them.
 
 Limitations:
 - Tiered ODIN layouts are imported as their capacity drives only, because the Storage Calculator models full-flash storage.
+- The Storage Calculator supports up to 16 nodes and 24 drives per node. Larger ODIN values are capped and the summary says so. Disaggregated Storage designs use an external SAN, so their S2D capacity results do not apply.
 - Prices (nodes, switches, related costs) are not part of ODIN exports and must be entered manually.
 - For L3 (disconnected operations) the host fee must be entered before the pricing is calculated.
 
