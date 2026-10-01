@@ -49,7 +49,7 @@ Estimates the physical CPU requirements for a given virtual workload across an A
 - CPU socket selector (single socket / dual socket)
 - N+1 High Availability capacity reservation toggle
 - Management overhead and vCPU-to-core ratio configuration
-- CPU recommendation cards showing fit, tight, or insufficient status
+- CPU recommendation cards showing fit, tight, or insufficient status. The recommended CPU is highlighted, and clicking any other card (including a smaller one) sizes the cluster with it; when the CPU is too small, the charts show the missing cores
 - Interactive 3D charts (core allocation donut, per-node distribution) with tooltips, clickable legend and drag to rotate
 - PDF export and browser print support
 

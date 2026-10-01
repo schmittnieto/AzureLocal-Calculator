@@ -63,10 +63,18 @@
     .overview-table .formula{font-size:.86em;opacity:.8}
 
     .cpu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px}
-    .cpu-card{border:1px solid #555;border-radius:8px;padding:12px;font-size:.88em}
+    .cpu-card{border:1px solid #555;border-radius:8px;padding:12px;font-size:.88em;cursor:pointer;transition:box-shadow .2s,border-color .2s,opacity .2s}
+    .cpu-card:hover{box-shadow:0 2px 10px rgba(0,0,0,.25)}
+    .cpu-card:focus{outline:none}
+    .cpu-card:focus-visible{outline:2px solid #007aff;outline-offset:2px}
     .cpu-card.match{border-color:#2e7d32}
     .cpu-card.tight{border-color:#cc7a00}
     .cpu-card.no-fit{border-color:#888;opacity:.65}
+    .cpu-card.recommended{border:2px solid #007aff;padding:11px;opacity:1;box-shadow:0 6px 22px rgba(0,122,255,.4)}
+    .cpu-card.selected{border:2px solid #8e44ad;padding:11px;box-shadow:0 6px 22px rgba(142,68,173,.45)}
+    .cpu-card.no-fit.selected{opacity:.85}
+    .cpu-tag.rec-tag{background:#007aff;color:#fff}
+    .cpu-tag.sel-tag{background:#8e44ad;color:#fff}
     .cpu-card .cpu-name{font-weight:700;font-size:.95em;margin-bottom:6px}
     .cpu-card .cpu-detail{line-height:1.5}
     .cpu-tag{display:inline-block;font-size:.72em;font-weight:700;padding:2px 8px;border-radius:4px;margin-left:6px;vertical-align:middle}
@@ -198,7 +206,7 @@
   <!-- CPU Recommendations -->
   <div id="cpuRecommendSection" class="card" style="display:none">
     <h3>CPU Recommendations</h3>
-    <p id="cpuRecommendIntro" style="font-size:.85em;margin:0 0 4px">Based on the minimum cores required per socket, this is the smallest common server CPU of each generation that fits your workload. Select a node type to see every CPU model that system can use.</p>
+    <p id="cpuRecommendIntro" style="font-size:.85em;margin:0 0 4px">Based on the minimum cores required per socket, this is the smallest common server CPU of each generation that fits your workload. Select a node type to see every CPU model that system can use. The recommended CPU is highlighted; click another card to size the cluster with it.</p>
     <p style="font-size:.82em;margin:0 0 10px;font-weight:600">Important: CPU availability depends on your OEM/server platform. Always confirm with your hardware vendor before purchasing. Newer generations offer better IPC and efficiency, enabling higher vCPU:core ratios.</p>
     <div id="cpuGrid" class="cpu-grid"></div>
   </div>
@@ -561,11 +569,28 @@
     .sort((a, b) => a.cores - b.cores || a.tdp - b.tdp || a.name.localeCompare(b.name));
   /* Catalog core options without any known model of the node type's generation */
   const unmatchedOptions = p => p.cores.filter(n => !cpuDatabase.some(c => nodeGenerations(p).includes(c.gen) && c.cores === n));
-  /* Smallest compatible CPU with enough cores (lowest TDP on a tie), else the largest one */
-  function pickCpu(p, sockets, minCoresPerSocket) {
-    const list = compatibleCpus(p, sockets);
-    return list.find(c => c.cores >= minCoresPerSocket) || list[list.length - 1] || null;
+  /* Generations sold in the "Current (2026 or later)" catalog systems */
+  const currentGenerations = new Set([].concat(...Object.values(catalogGenerations), ...Object.values(nodeTypeGenerations)));
+  /* Recommended CPU of a card list: the smallest model with enough cores (current catalog
+     generations first, lowest TDP on a tie), else the largest one */
+  function recommendCpu(list, minCoresPerSocket) {
+    const isCurrent = c => currentGenerations.has(c.gen) ? 0 : 1;
+    const fit = list.filter(c => c.cores >= minCoresPerSocket)
+      .sort((a, b) => isCurrent(a) - isCurrent(b) || a.cores - b.cores || a.tdp - b.tdp);
+    if (fit.length) return fit[0];
+    return list.slice().sort((a, b) => b.cores - a.cores || isCurrent(a) - isCurrent(b) || a.tdp - b.tdp)[0] || null;
   }
+  /* CPU recommendation cards: with a node type its compatible models, without one the
+     smallest fitting model of each generation (or the largest one) */
+  function recommendationCandidates(p, sockets, minCoresPerSocket) {
+    if (p) return compatibleCpus(p, sockets);
+    return [...new Set(cpuDatabase.map(c => c.gen))].map(gen => {
+      const list = cpuDatabase.filter(c => c.gen === gen && cpuSockets(c) >= sockets).sort((a, b) => a.cores - b.cores || a.tdp - b.tdp);
+      return list.find(c => c.cores >= minCoresPerSocket) || list[list.length - 1];
+    }).filter(Boolean);
+  }
+  /* CPU card the user clicked to size with instead of the recommended one */
+  let chosenCpuName = null;
   const cpuSpecs = cpu => cpu.cores + " cores/socket | " + cpu.gen +
     (cpu.base ? " | " + cpu.base.toFixed(1) + " GHz" : "") + (cpu.tdp ? " | TDP " + cpu.tdp + "W" : "") +
     (cpuSockets(cpu) === 1 ? " | single socket only" : "");
@@ -680,6 +705,7 @@
     }
     nodeCount.min = p ? p.nodes[0] : 1;
     nodeCount.max = p ? p.nodes[1] : 16;
+    chosenCpuName = null;
     fillCpuSelect();
     updateNodeTypeInfo();
   }
@@ -737,9 +763,19 @@
     const coresNeededPerNode   = workloadNodes > 0 ? Math.ceil(c.workloadCores / workloadNodes) : c.workloadCores;
     const minCoresPerSocket    = Math.ceil((coresNeededPerNode + c.mgmtPerNode) / c.socketsPerNode);
 
-    /* with a node type, size with the real CPU it would use instead of the theoretical minimum */
+    /* size with a real CPU: the card the user selected, else the recommended one */
     const nodeType = selectedNodeType();
-    const pickedCpu = nodeType ? pickCpu(nodeType, c.socketsPerNode, minCoresPerSocket) : null;
+    const candidates = recommendationCandidates(nodeType, c.socketsPerNode, minCoresPerSocket);
+    const recommendedCpu = recommendCpu(candidates, minCoresPerSocket);
+    let chosenCpu = chosenCpuName ? candidates.find(x => x.name === chosenCpuName) : null;
+    if (chosenCpuName && !chosenCpu) {
+      /* keep a selection that is still valid even when it is no longer one of the generation cards */
+      const cpu = cpuDatabase.find(x => x.name === chosenCpuName);
+      const valid = cpu && (nodeType ? compatibleCpus(nodeType, c.socketsPerNode).includes(cpu) : cpuSockets(cpu) >= c.socketsPerNode);
+      if (valid) { chosenCpu = cpu; candidates.push(cpu); } else chosenCpuName = null;
+    }
+    if (chosenCpu === recommendedCpu) { chosenCpu = null; chosenCpuName = null; }
+    const pickedCpu = chosenCpu || recommendedCpu;
     const coresPerSocket = pickedCpu ? pickedCpu.cores : minCoresPerSocket;
 
     const physicalCoresPerNode   = coresPerSocket * c.socketsPerNode;
@@ -766,7 +802,8 @@
     html += "<strong>Minimum Cores per Socket:</strong> " + minCoresPerSocket + " cores<br>";
     html += "<strong>Nodes for Workloads:</strong> " + workloadNodes + " of " + nodes + (haEnabled ? " (1 reserved for HA)" : "") + "<br>";
     html += "<strong>Max vCPUs Supported:</strong> " + maxVCPUs + " vCPUs<br>";
-    html += nodeTypeChecks(nodes, minCoresPerSocket, pickedCpu);
+    html += nodeTypeChecks(nodes);
+    html += sizingCpuLines(minCoresPerSocket, recommendedCpu, chosenCpu);
     if (fits) {
       html += '<span class="ok">The cluster has sufficient CPU capacity with ' + (pickedCpu ? pickedCpu.name + " (" + coresPerSocket + " cores per socket)" : minCoresPerSocket + "+ core sockets") + '.</span>';
     } else {
@@ -774,7 +811,7 @@
     }
     rb.innerHTML = html;
 
-    buildCpuRecommendations(minCoresPerSocket);
+    buildCpuRecommendations(minCoresPerSocket, candidates, recommendedCpu, chosenCpu);
 
     $("chartsSection").style.display = "block";
     drawCoreChart(c.workloadCores, totalMgmtCores, haCores, totalAvailableCores);
@@ -787,7 +824,7 @@
       minCoresPerSocket, coresPerSocket, physicalCoresPerNode, availableCoresPerNode,
       totalAvailableCores, totalMgmtCores, totalPhysicalCores, haCores,
       maxVCPUs, utilization, fits, minNodesTotal,
-      cpuName: null, pickedCpu
+      cpuName: null, pickedCpu, recommendedCpu, chosenCpu
     });
 
     $("exportPdfBtn").style.display = "inline-block";
@@ -834,7 +871,7 @@
     html += '<strong>Minimum Nodes Required:</strong> <span class="ok">' + minNodes + " nodes</span>" + (haEnabled ? " (includes +1 for HA)" : "") + "<br>";
     html += "<strong>Max vCPUs Supported (" + minNodes + " nodes):</strong> " + maxVCPUs + " vCPUs<br>";
     html += "<strong>Core Utilization:</strong> " + utilization.toFixed(1) + "%<br>";
-    html += nodeTypeChecks(minNodes, null);
+    html += nodeTypeChecks(minNodes);
     rb.innerHTML = html;
 
     /* hide CPU recommendation grid (not relevant in this mode) */
@@ -861,22 +898,31 @@
   /* ================================================================
      NODE TYPE CHECKS (result box lines)
      ================================================================ */
-  function nodeTypeChecks(nodes, minCoresPerSocket, pickedCpu) {
+  function nodeTypeChecks(nodes) {
     const p = selectedNodeType();
     if (!p) return "";
     let html = "<strong>Node Type:</strong> " + p.vendor + " " + p.name + " (" + nodeCpuLabel(p) + ")<br>";
     if (nodes < p.nodes[0] || nodes > p.nodes[1]) {
       html += '<span class="warning">' + nodes + " nodes is outside the supported scale of this node type (" + p.nodes[0] + " to " + p.nodes[1] + " nodes).</span><br>";
     }
-    if (minCoresPerSocket !== null) {
-      if (!pickedCpu) {
-        html += '<span class="warning">No known CPU model is compatible with this node type and socket count.</span><br>';
-      } else if (pickedCpu.cores >= minCoresPerSocket) {
-        html += "<strong>Recommended CPU:</strong> " + pickedCpu.name + " (" + cpuSpecs(pickedCpu) + ")<br>";
-        html += "<strong>Sized With:</strong> " + pickedCpu.cores + " cores per socket, the smallest compatible model with " + minCoresPerSocket + "+ cores<br>";
-      } else {
-        html += '<span class="warning">No compatible CPU has ' + minCoresPerSocket + "+ cores per socket. Sized with the largest one, " + pickedCpu.name + " (" + pickedCpu.cores + " cores). Add nodes or choose another node type.</span><br>";
+    return html;
+  }
+
+  /* Mode A: the recommended CPU and the CPU the cluster is sized with */
+  function sizingCpuLines(minCoresPerSocket, recommended, chosen) {
+    if (!recommended) return '<span class="warning">No known CPU model is compatible with this node type and socket count.</span><br>';
+    const scope = selectedNodeType() ? "compatible model" : "current-generation model";
+    let html = "<strong>Recommended CPU:</strong> " + recommended.name + " (" + cpuSpecs(recommended) + ")<br>";
+    if (chosen) {
+      html += "<strong>Selected CPU:</strong> " + chosen.name + " (" + cpuSpecs(chosen) + ")<br>";
+      html += "<strong>Sized With:</strong> " + chosen.cores + " cores per socket, the CPU selected in CPU Recommendations<br>";
+      if (chosen.cores < minCoresPerSocket) {
+        html += '<span class="warning">The selected CPU has fewer than the ' + minCoresPerSocket + " cores per socket the workload needs. The charts show the missing cores.</span><br>";
       }
+    } else if (recommended.cores >= minCoresPerSocket) {
+      html += "<strong>Sized With:</strong> " + recommended.cores + " cores per socket, the smallest " + scope + " with " + minCoresPerSocket + "+ cores<br>";
+    } else {
+      html += '<span class="warning">No ' + (selectedNodeType() ? "compatible " : "") + "CPU has " + minCoresPerSocket + "+ cores per socket. Sized with the largest one, " + recommended.name + " (" + recommended.cores + " cores). Add nodes" + (selectedNodeType() ? " or choose another node type" : "") + ".</span><br>";
     }
     return html;
   }
@@ -886,7 +932,7 @@
      ================================================================ */
   const defaultRecommendIntro = $("cpuRecommendIntro").textContent;
 
-  function buildCpuRecommendations(minCores) {
+  function buildCpuRecommendations(minCores, candidates, recommended, chosen) {
     $("cpuRecommendSection").style.display = "block";
     const grid = $("cpuGrid"), p = selectedNodeType();
 
@@ -894,17 +940,14 @@
     const sockets = Math.max(num($("socketsPerNode")), 1);
     $("cpuRecommendIntro").textContent = p
       ? "Based on the minimum cores required per socket, these are the CPU models " + p.name + " can use: " + nodeCpuLabel(p) +
-        " models with a cores-per-socket option the Azure Local catalog lists for this system that support " + sockets + " socket" + (sockets > 1 ? "s" : "") + "."
+        " models with a cores-per-socket option the Azure Local catalog lists for this system that support " + sockets + " socket" + (sockets > 1 ? "s" : "") +
+        ". The recommended CPU is highlighted; click another card, including a smaller one, to size the cluster with it."
       : defaultRecommendIntro;
-    /* without a node type: per CPU generation the smallest model that fits (or the largest one) */
-    const perGeneration = () => [...new Set(cpuDatabase.map(c => c.gen))].map(gen => {
-      const list = cpuDatabase.filter(c => c.gen === gen && cpuSockets(c) >= sockets).sort((a, b) => a.cores - b.cores || a.tdp - b.tdp);
-      return list.find(c => c.cores >= minCores) || list[list.length - 1];
-    }).filter(Boolean);
-    const items = (p ? compatibleCpus(p, sockets) : perGeneration()).map(cpu => ({ name: cpu.name, cores: cpu.cores, tdp: cpu.tdp, detail: cpuSpecs(cpu) }));
 
-    /* sort: best fit first, then by cores and TDP ascending */
-    const sorted = items.sort((a, b) => {
+    /* sort: recommended first, then fitting models by cores and TDP ascending */
+    const sorted = candidates.slice().sort((a, b) => {
+      const aRec = a === recommended ? 0 : 1, bRec = b === recommended ? 0 : 1;
+      if (aRec !== bRec) return aRec - bRec;
       const aFit = a.cores >= minCores ? 0 : 1;
       const bFit = b.cores >= minCores ? 0 : 1;
       if (aFit !== bFit) return aFit - bFit;
@@ -918,13 +961,35 @@
       if (ratio >= 1.2)      { cls = "match"; tag = '<span class="cpu-tag fit">Good Fit</span>'; }
       else if (ratio >= 1.0) { cls = "tight"; tag = '<span class="cpu-tag tight-tag">Tight Fit</span>'; }
       else                   { cls = "no-fit"; tag = '<span class="cpu-tag small">Too Small</span>'; }
+      const isRec = cpu === recommended, isSel = cpu === chosen;
+      if (isRec) { cls += " recommended"; tag += '<span class="cpu-tag rec-tag">Recommended</span>'; }
+      if (isSel) { cls += " selected"; tag += '<span class="cpu-tag sel-tag">Selected</span>'; }
 
-      html += '<div class="cpu-card ' + cls + '">';
+      html += '<div class="cpu-card ' + cls + '" data-cpu="' + cpu.name + '" role="button" tabindex="0" aria-pressed="' + (isSel || (isRec && !chosen)) + '"' +
+        ' title="' + (isRec ? "Recommended CPU" : "Size the cluster with this CPU") + '">';
       html += '<div class="cpu-name">' + cpu.name + tag + '</div>';
-      html += '<div class="cpu-detail">' + cpu.detail + '</div></div>';
+      html += '<div class="cpu-detail">' + cpuSpecs(cpu) + '</div></div>';
     }
     grid.innerHTML = html;
   }
+
+  /* clicking a card sizes the cluster with that CPU; clicking the recommended one goes back to it */
+  function chooseCard(card) {
+    if (!card) return;
+    const name = card.dataset.cpu, hadFocus = card === document.activeElement;
+    chosenCpuName = name;
+    calculate();
+    const again = $("cpuGrid").querySelector('[data-cpu="' + name + '"]');
+    if (again && hadFocus) again.focus({ preventScroll: true });
+  }
+  $("cpuGrid").addEventListener("click", e => chooseCard(e.target.closest(".cpu-card")));
+  $("cpuGrid").addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const card = e.target.closest(".cpu-card");
+    if (!card) return;
+    e.preventDefault();
+    chooseCard(card);
+  });
 
   /* ================================================================
      OVERVIEW TABLE
@@ -961,8 +1026,9 @@
       row("Cores Needed per Node (workload + mgmt)", "ceil(" + d.workloadCores + " / " + d.workloadNodes + ") + " + d.mgmtPerNode, (d.availableCoresPerNode + d.mgmtPerNode) + " cores");
       row("Minimum Cores per Socket", "(ceil(" + d.workloadCores + " / " + d.workloadNodes + ") + " + d.mgmtPerNode + ") / " + d.socketsPerNode + " socket(s)", d.minCoresPerSocket + " cores");
       if (d.pickedCpu) {
-        row("Recommended CPU for the Node Type", "Smallest compatible model with enough cores", d.pickedCpu.name);
-        total("Recommended Socket", d.coresPerSocket + " cores per socket (" + d.pickedCpu.name + ")");
+        row("Recommended CPU", (nodeType ? "Smallest compatible model" : "Smallest current-generation model") + " with enough cores", d.recommendedCpu.name);
+        if (d.chosenCpu) row("Selected CPU", "User-selected in CPU Recommendations", d.chosenCpu.name);
+        total("Sized With", d.coresPerSocket + " cores per socket (" + d.pickedCpu.name + ")");
       } else {
         total("Recommended Socket", d.minCoresPerSocket + "+ cores per socket");
       }
@@ -1731,7 +1797,7 @@
   }
 
   function drawNodeChart(nodes, coresPerNode, mgmtPerNode, availPerNode, totalWorkloadCores, workloadNodes, haEnabled) {
-    const labels = [], mgmtData = [], workloadData = [], freeData = [];
+    const labels = [], mgmtData = [], workloadData = [], freeData = [], missingData = [];
     const workloadPerNode = workloadNodes > 0 ? Math.ceil(totalWorkloadCores / workloadNodes) : 0;
 
     for (let i = 1; i <= nodes; i++) {
@@ -1741,22 +1807,27 @@
       if (isHA) {
         workloadData.push(0);
         freeData.push(availPerNode);
+        missingData.push(0);
       } else {
         const assigned = Math.min(workloadPerNode, availPerNode);
         workloadData.push(assigned);
         freeData.push(Math.max(availPerNode - assigned, 0));
+        missingData.push(Math.max(workloadPerNode - availPerNode, 0));
       }
     }
+    const series = [
+      { label: "Management",  color: C3D_COLORS.orange, data: mgmtData },
+      { label: "VM Workload", color: C3D_COLORS.blue,   data: workloadData },
+      { label: "Free",        color: C3D_COLORS.aqua,   data: freeData }
+    ];
+    /* a CPU that is too small: the workload cores each node lacks, stacked above its capacity */
+    if (missingData.some(v => v > 0)) series.push({ label: "Missing (short)", color: C3D.critical, data: missingData });
 
     if (nodeChart) nodeChart.destroy();
     nodeChart = new Chart3D($("nodeChart"), {
       type: "bar", title: "Per-Node Core Distribution", categories: labels,
       format: cores, axisFormat: v => String(+v.toFixed(1)),
-      series: [
-        { label: "Management",  color: C3D_COLORS.orange, data: mgmtData },
-        { label: "VM Workload", color: C3D_COLORS.blue,   data: workloadData },
-        { label: "Free",        color: C3D_COLORS.aqua,   data: freeData }
-      ]
+      series
     });
   }
 
@@ -2162,6 +2233,7 @@
 
   function applyOdinConfig(cfg, fileName) {
     const applied = [], notes = [];
+    chosenCpuName = null;
 
     if (selectedNodeType()) {
       $("nodeType").value = "";
