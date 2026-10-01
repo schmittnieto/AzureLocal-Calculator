@@ -2,7 +2,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     *{box-sizing:border-box}
     body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
@@ -627,29 +626,739 @@
   }
 
   /* ================================================================
+     3D CHARTS
+     Self-contained canvas renderer (no external libraries) for 3D donut
+     and 3D bar charts: hover and keyboard tooltips, clickable legend,
+     drag to rotate and double-click to reset the view.
+     The same block is used in all three V2 calculators.
+     ================================================================ */
+  var C3D = {
+    font: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif',
+    surface: "#ffffff", ink: "#1f1f1e", ink2: "#52514e", muted: "#8a8984",
+    grid: "#e6e5e1", floor: "#f3f2ef", critical: "#d03b3b"
+  };
+  /* Validated categorical slots (light mode, white surface) */
+  var C3D_COLORS = {
+    blue: "#2a78d6", orange: "#eb6834", aqua: "#1baf7a", yellow: "#eda100",
+    magenta: "#e87ba4", green: "#008300", violet: "#4a3aa7"
+  };
+
+  /* f < 1 darkens, f > 1 mixes towards white */
+  function c3dMix(hex, f) {
+    var n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255];
+    for (var i = 0; i < 3; i++) c[i] = Math.round(f <= 1 ? c[i] * f : c[i] + (255 - c[i]) * (f - 1));
+    return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+  }
+
+  function c3dCompact(v) {
+    var a = Math.abs(v);
+    if (a >= 1e6) return +(v / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "M";
+    if (a >= 1e3) return +(v / 1e3).toFixed(a >= 1e4 ? 0 : 1) + "k";
+    return String(+v.toFixed(a < 10 ? 2 : 0));
+  }
+
+  function c3dNiceScale(max, count) {
+    if (!(max > 0)) return { max: 1, step: 0.25 };
+    var raw = max / count, mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10)), n = raw / mag;
+    var step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+    return { max: Math.ceil(max / step - 1e-9) * step, step: step };
+  }
+
+  function c3dInPoly(x, y, p) {
+    var inside = false;
+    for (var i = 0, j = p.length - 1; i < p.length; j = i++) {
+      if ((p[i][1] > y) !== (p[j][1] > y) &&
+          x < (p[j][0] - p[i][0]) * (y - p[i][1]) / (p[j][1] - p[i][1]) + p[i][0]) inside = !inside;
+    }
+    return inside;
+  }
+
+  function c3dPoly(ctx, p, fill, stroke, width) {
+    ctx.beginPath();
+    ctx.moveTo(p[0][0], p[0][1]);
+    for (var i = 1; i < p.length; i++) ctx.lineTo(p[i][0], p[i][1]);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width || 1; ctx.lineJoin = "round"; ctx.stroke(); }
+  }
+
+  function c3dRoundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function c3dFit(ctx, text, max) {
+    text = String(text);
+    if (ctx.measureText(text).width <= max) return text;
+    while (text.length > 1 && ctx.measureText(text + "…").width > max) text = text.slice(0, -1);
+    return text + "…";
+  }
+
+  /* cfg.type "donut": { title, slices: [{label, value, color}], format(v), center(total) -> {value, label, critical} }
+     cfg.type "bar":   { title, categories: [], series: [{label, color, data: []}], horizontal, legend,
+                         format(v), axisFormat(v) }  Bars are always stacked per category. */
+  function Chart3D(canvas, cfg) {
+    var self = this;
+    this.canvas = canvas;
+    this.cfg = cfg;
+    this.ctx = canvas.getContext("2d");
+    this.hidden = {};
+    this.hover = null;
+    this.focus = null;
+    this.pointer = null;
+    this.drag = null;
+    this.marks = [];
+    this.order = [];
+    this.legendBoxes = [];
+    this.view = this.defaultView();
+    this.reduced = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    this.progress = this.reduced ? 1 : 0;
+    canvas.tabIndex = 0;
+    canvas.setAttribute("role", "img");
+    canvas.style.touchAction = "pan-y";
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    canvas.style.outlineOffset = "2px";
+    this.on = {
+      move: function(e) { self.onMove(e); },
+      leave: function() { self.onLeave(); },
+      down: function(e) { self.onDown(e); },
+      up: function(e) { self.onUp(e); },
+      dbl: function() { self.view = self.defaultView(); self.draw(); },
+      key: function(e) { self.onKey(e); },
+      blur: function() { self.focus = null; self.draw(); },
+      resize: function() { self.resize(); }
+    };
+    canvas.addEventListener("pointermove", this.on.move);
+    canvas.addEventListener("pointerleave", this.on.leave);
+    canvas.addEventListener("pointerdown", this.on.down);
+    window.addEventListener("pointerup", this.on.up);
+    canvas.addEventListener("dblclick", this.on.dbl);
+    canvas.addEventListener("keydown", this.on.key);
+    canvas.addEventListener("blur", this.on.blur);
+    window.addEventListener("resize", this.on.resize);
+    if (window.ResizeObserver && canvas.parentNode) {
+      this.observer = new ResizeObserver(this.on.resize);
+      this.observer.observe(canvas.parentNode);
+    }
+    /* the print stylesheet changes the chart height: redraw at print size */
+    this.print = window.matchMedia ? window.matchMedia("print") : null;
+    if (this.print) {
+      if (this.print.addEventListener) this.print.addEventListener("change", this.on.resize);
+      else if (this.print.addListener) this.print.addListener(this.on.resize);
+    }
+    this.resize();
+    if (!this.reduced) this.animate();
+  }
+
+  Chart3D.prototype.defaultView = function() {
+    return this.cfg.type === "donut" ? { rot: -Math.PI / 2, tilt: 0.95 } : { angle: 0.75, depth: 1 };
+  };
+
+  Chart3D.prototype.destroy = function() {
+    var c = this.canvas;
+    c.removeEventListener("pointermove", this.on.move);
+    c.removeEventListener("pointerleave", this.on.leave);
+    c.removeEventListener("pointerdown", this.on.down);
+    window.removeEventListener("pointerup", this.on.up);
+    c.removeEventListener("dblclick", this.on.dbl);
+    c.removeEventListener("keydown", this.on.key);
+    c.removeEventListener("blur", this.on.blur);
+    window.removeEventListener("resize", this.on.resize);
+    if (this.observer) this.observer.disconnect();
+    if (this.print) {
+      if (this.print.removeEventListener) this.print.removeEventListener("change", this.on.resize);
+      else if (this.print.removeListener) this.print.removeListener(this.on.resize);
+    }
+    if (this.raf) cancelAnimationFrame(this.raf);
+    clearTimeout(this.fallback);
+    c.style.cursor = "";
+  };
+
+  Chart3D.prototype.resize = function() {
+    var box = this.canvas.parentNode, dpr = window.devicePixelRatio || 1;
+    var w = box ? box.clientWidth : this.canvas.clientWidth, h = box ? box.clientHeight : this.canvas.clientHeight;
+    if (!w || !h || (w === this.w && h === this.h && dpr === this.dpr)) return;
+    this.w = w; this.h = h; this.dpr = dpr;
+    this.canvas.width = Math.round(w * dpr);
+    this.canvas.height = Math.round(h * dpr);
+    this.draw();
+  };
+
+  Chart3D.prototype.animate = function() {
+    var self = this, start = null;
+    function step(t) {
+      if (start === null) start = t;
+      var k = Math.min((t - start) / 700, 1);
+      self.progress = 1 - Math.pow(1 - k, 3);
+      self.draw();
+      self.raf = k < 1 ? requestAnimationFrame(step) : null;
+    }
+    this.raf = requestAnimationFrame(step);
+    /* Background tabs pause animation frames; never leave a chart half drawn */
+    this.fallback = setTimeout(function() {
+      if (self.progress < 1) { if (self.raf) cancelAnimationFrame(self.raf); self.raf = null; self.progress = 1; self.draw(); }
+    }, 1500);
+  };
+
+  Chart3D.prototype.items = function() {
+    var cfg = this.cfg;
+    return cfg.type === "donut" ? cfg.slices : cfg.series;
+  };
+
+  Chart3D.prototype.activeKey = function() {
+    return this.drag && this.drag.moved ? null : (this.focus !== null ? this.focus : this.hover);
+  };
+
+  /* ---------------- frame ---------------- */
+  Chart3D.prototype.draw = function() {
+    if (!this.w) return;
+    var ctx = this.ctx, cfg = this.cfg;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.fillStyle = C3D.surface;
+    ctx.fillRect(0, 0, this.w, this.h);
+    this.marks = [];
+    this.order = [];
+
+    ctx.font = "600 14px " + C3D.font;
+    ctx.fillStyle = C3D.ink;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(c3dFit(ctx, cfg.title, this.w - 24), this.w / 2, 12);
+
+    var legendH = this.layoutLegend();
+    var area = { x: 12, y: 38, w: this.w - 24, h: this.h - 38 - legendH - 8 };
+    this.area = area;
+    if (cfg.type === "donut") this.drawDonut(area); else this.drawBars(area);
+    this.drawLegend();
+    this.drawHint();
+    this.drawTooltip();
+    this.updateAria();
+  };
+
+  Chart3D.prototype.empty = function(a, text) {
+    var ctx = this.ctx;
+    ctx.font = "13px " + C3D.font;
+    ctx.fillStyle = C3D.muted;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, a.x + a.w / 2, a.y + a.h / 2);
+  };
+
+  /* ---------------- legend ---------------- */
+  Chart3D.prototype.legendText = function(item) {
+    return this.cfg.type === "donut" ? item.label + "  " + this.cfg.format(item.value) : item.label;
+  };
+
+  Chart3D.prototype.layoutLegend = function() {
+    var ctx = this.ctx, self = this, items = this.items(), maxW = this.w - 24, rows = [[]], rowW = [0];
+    this.legendBoxes = [];
+    if (this.cfg.legend === false) return 0;
+    ctx.font = "12px " + C3D.font;
+    items.forEach(function(it, i) {
+      if (self.cfg.type === "donut" && !(it.value > 0)) return;
+      var text = c3dFit(ctx, self.legendText(it), maxW - 20), w = 16 + ctx.measureText(text).width;
+      var r = rows.length - 1;
+      if (rows[r].length && rowW[r] + 14 + w > maxW) { rows.push([]); rowW.push(0); r++; }
+      rowW[r] += (rows[r].length ? 14 : 0) + w;
+      rows[r].push({ i: i, text: text, w: w });
+    });
+    var y = this.h - 8 - rows.length * 20;
+    rows.forEach(function(row, r) {
+      var x = (self.w - rowW[r]) / 2;
+      row.forEach(function(b) {
+        self.legendBoxes.push({ i: b.i, text: b.text, x: x, y: y + r * 20, w: b.w, h: 20 });
+        x += b.w + 14;
+      });
+    });
+    return rows.length * 20 + 4;
+  };
+
+  Chart3D.prototype.drawLegend = function() {
+    var ctx = this.ctx, self = this, items = this.items(), act = this.activeKey();
+    ctx.font = "12px " + C3D.font;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    this.legendBoxes.forEach(function(b) {
+      var it = items[b.i], off = self.hidden[b.i], cy = b.y + b.h / 2;
+      var emph = act !== null && self.keyItem(act) === b.i;
+      c3dRoundRect(ctx, b.x, cy - 5, 10, 10, 2);
+      if (off) { ctx.strokeStyle = it.color; ctx.lineWidth = 1.5; ctx.stroke(); }
+      else { ctx.fillStyle = it.color; ctx.fill(); }
+      ctx.fillStyle = off ? C3D.muted : (emph ? C3D.ink : C3D.ink2);
+      ctx.fillText(b.text, b.x + 16, cy);
+      if (off) {
+        ctx.fillRect(b.x + 16, cy, ctx.measureText(b.text).width, 1);
+      }
+    });
+  };
+
+  Chart3D.prototype.drawHint = function() {
+    if (!this.pointer || this.activeKey() !== null || this.drag) return;
+    var ctx = this.ctx, a = this.area;
+    ctx.font = "10px " + C3D.font;
+    ctx.fillStyle = C3D.muted;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("Drag to rotate, double-click to reset", a.x + a.w, a.y + a.h + 6);
+  };
+
+  /* ---------------- donut ---------------- */
+  Chart3D.prototype.drawDonut = function(a) {
+    var cfg = this.cfg, ctx = this.ctx, self = this, v = this.view;
+    var sinP = Math.sin(v.tilt), cosP = Math.cos(v.tilt), THICK = 0.24, INNER = 0.56;
+    var R = Math.max(10, Math.min(a.w * 0.4, a.h * 0.9 / (2 * sinP + THICK * cosP)));
+    var wall = THICK * R * cosP, r0 = R * INNER;
+    var cx = a.x + a.w / 2, cy = a.y + (a.h - (2 * R * sinP + wall)) / 2 + R * sinP;
+    var total = 0, pieces = [];
+    cfg.slices.forEach(function(s, i) { if (!self.hidden[i] && s.value > 0) total += s.value; });
+
+    /* soft ground shadow shaped as a ring, so the hole stays clean for the center label */
+    ctx.save();
+    ctx.translate(cx, cy + wall + 6);
+    ctx.scale(1, Math.max(sinP, 0.2));
+    var g = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.12);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(INNER * 0.85 / 1.12, "rgba(0,0,0,0)");
+    g.addColorStop(0.82, "rgba(0,0,0,0.13)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 1.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    if (!(total > 0)) { this.empty(a, "No values to display"); return; }
+
+    var sweep = Math.PI * 2 * this.progress, start = v.rot, act = this.activeKey(), full = Math.PI * 2;
+    cfg.slices.forEach(function(s, i) {
+      if (self.hidden[i] || !(s.value > 0)) return;
+      var span = s.value / total * sweep;
+      pieces.push({ i: i, a0: start, a1: start + span });
+      self.order.push("s" + i);
+      start += span;
+    });
+
+    /* parts of [a0, a1] where sin() has the wanted sign: outer walls face the viewer in the
+       front half (0..PI), inner walls in the back half (PI..2PI) */
+    function visible(a0, a1, lo) {
+      var out = [], k = Math.floor((a0 - lo - Math.PI) / full);
+      for (; lo + k * full < a1; k++) {
+        var s = Math.max(a0, lo + k * full), e = Math.min(a1, lo + Math.PI + k * full);
+        if (e > s + 1e-4) out.push([s, e]);
+      }
+      return out;
+    }
+
+    function build(pc, lifted) {
+      var mid = (pc.a0 + pc.a1) / 2, d = lifted ? R * 0.07 : 0, span = pc.a1 - pc.a0;
+      var ox = Math.cos(mid) * d, oy = Math.sin(mid) * d * sinP - (lifted ? 4 : 0);
+      var color = cfg.slices[pc.i].color, b = { color: color, cuts: [], inner: [], outer: [], top: [] };
+      function P(ang, r, z) { return [cx + ox + r * Math.cos(ang), cy + oy + r * Math.sin(ang) * sinP + (1 - z) * wall]; }
+      function arc(s, e, r, z, list, back) {
+        var n = Math.max(2, Math.ceil((e - s) / (Math.PI / 90)));
+        for (var j = 0; j <= n; j++) list.push(P(back ? e - (e - s) * j / n : s + (e - s) * j / n, r, z));
+      }
+      function wallPoly(s, e, r) { var p = []; arc(s, e, r, 1, p, false); arc(s, e, r, 0, p, true); return p; }
+      if (pieces.length > 1 || span < full - 1e-6) {
+        [pc.a0, pc.a1].forEach(function(ang) {
+          b.cuts.push({ depth: Math.sin(ang), poly: [P(ang, r0, 1), P(ang, R, 1), P(ang, R, 0), P(ang, r0, 0)] });
+        });
+      }
+      visible(pc.a0, pc.a1, Math.PI).forEach(function(iv) { b.inner.push(wallPoly(iv[0], iv[1], r0)); });
+      visible(pc.a0, pc.a1, 0).forEach(function(iv) { b.outer.push(wallPoly(iv[0], iv[1], R)); });
+      arc(pc.a0, pc.a1, R, 1, b.top, false);
+      arc(pc.a0, pc.a1, r0, 1, b.top, true);
+      /* one light from the front left: walls get a smooth horizontal gradient instead of facets */
+      b.outerFill = ctx.createLinearGradient(cx - R, 0, cx + R, 0);
+      b.outerFill.addColorStop(0, c3dMix(color, 0.9));
+      b.outerFill.addColorStop(1, c3dMix(color, 0.6));
+      b.innerFill = ctx.createLinearGradient(cx - r0, 0, cx + r0, 0);
+      b.innerFill.addColorStop(0, c3dMix(color, 0.55));
+      b.innerFill.addColorStop(1, c3dMix(color, 0.78));
+      b.cutFill = c3dMix(color, 0.72);
+      return b;
+    }
+
+    /* painter's order: cut faces (far first), inner back walls, outer front walls, tops */
+    function paint(list) {
+      var cuts = [];
+      list.forEach(function(b) { b.cuts.forEach(function(c) { cuts.push({ c: c, b: b }); }); });
+      cuts.sort(function(x, y) { return x.c.depth - y.c.depth; });
+      cuts.forEach(function(x) { c3dPoly(ctx, x.c.poly, x.b.cutFill, x.b.cutFill, 0.5); });
+      list.forEach(function(b) { b.inner.forEach(function(p) { c3dPoly(ctx, p, b.innerFill, null); }); });
+      list.forEach(function(b) { b.outer.forEach(function(p) { c3dPoly(ctx, p, b.outerFill, null); }); });
+      list.forEach(function(b) {
+        c3dPoly(ctx, b.top, b.hot ? c3dMix(b.color, 1.14) : b.color, C3D.surface, 1.5);
+        self.marks.push({ key: b.key, polys: [b.top].concat(b.outer, b.inner), cx: b.cx, cy: b.cy });
+      });
+    }
+
+    var rest = [], hot = [];
+    pieces.forEach(function(pc) {
+      var key = "s" + pc.i, b = build(pc, key === act), mid = (pc.a0 + pc.a1) / 2;
+      b.key = key;
+      b.hot = key === act;
+      b.cx = cx + Math.cos(mid) * (R + r0) / 2;
+      b.cy = cy + Math.sin(mid) * (R + r0) / 2 * sinP;
+      (b.hot ? hot : rest).push(b);
+    });
+    paint(rest);
+    paint(hot);
+
+    var c = cfg.center ? cfg.center(total) : null, room = 2 * r0 * sinP - wall, maxW = r0 * 1.6;
+    if (c && room > 30 && r0 > 46) {
+      var ty = cy + wall / 2, size = room > 54 ? 16 : 13;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      do { ctx.font = "600 " + size + "px " + C3D.font; } while (ctx.measureText(c.value).width > maxW && --size > 10);
+      ctx.fillStyle = c.critical ? C3D.critical : C3D.ink;
+      ctx.fillText(c3dFit(ctx, c.value, maxW), cx, ty - 8);
+      ctx.font = "11px " + C3D.font;
+      ctx.fillStyle = C3D.ink2;
+      ctx.fillText(c3dFit(ctx, c.label, maxW), cx, ty + 9);
+    }
+  };
+
+  /* ---------------- bars ---------------- */
+  function c3dBox(ctx, x, y, w, h, dx, dy, color, hot) {
+    var front = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+    var top = [[x, y], [x + w, y], [x + w + dx, y + dy], [x + dx, y + dy]];
+    var side = [[x + w, y], [x + w + dx, y + dy], [x + w + dx, y + h + dy], [x + w, y + h]];
+    var base = hot ? 1.12 : 1;
+    c3dPoly(ctx, side, c3dMix(color, 0.7 * base), C3D.surface, 1);
+    c3dPoly(ctx, top, c3dMix(color, 1.2 * base), C3D.surface, 1);
+    c3dPoly(ctx, front, hot ? c3dMix(color, base) : color, C3D.surface, 1);
+    return [front, top, side];
+  }
+
+  Chart3D.prototype.drawBars = function(a) {
+    var cfg = this.cfg, ctx = this.ctx, self = this, horiz = !!cfg.horizontal, K = cfg.categories.length;
+    var vis = [], totals = [], max = 0, act = this.activeKey(), p = this.progress;
+    var fmtAxis = cfg.axisFormat || c3dCompact;
+    cfg.series.forEach(function(s, i) { if (!self.hidden[i]) vis.push(i); });
+    for (var k = 0; k < K; k++) {
+      var t = 0;
+      vis.forEach(function(i) { t += Math.max(cfg.series[i].data[k] || 0, 0); });
+      totals.push(t);
+      max = Math.max(max, t);
+    }
+    if (!K || !(max > 0)) { this.empty(a, "No values to display"); return; }
+    var scale = c3dNiceScale(max, 4), ticks = [];
+    for (var tv = 0; tv <= scale.max + scale.step / 2; tv += scale.step) ticks.push(tv);
+
+    ctx.font = "11px " + C3D.font;
+    var x0, x1, yt, yb, band, thick, d, dx, dy;
+    if (!horiz) {
+      var tickW = 0;
+      ticks.forEach(function(t) { tickW = Math.max(tickW, ctx.measureText(fmtAxis(t)).width); });
+      x0 = a.x + tickW + 8;
+      band = (a.w - tickW - 8) / K;
+      d = Math.min(16, band * 0.3) * this.view.depth;
+      dx = d * Math.cos(this.view.angle); dy = -d * Math.sin(this.view.angle);
+      x1 = a.x + a.w - dx - 4;
+      yt = a.y + 16 - dy;
+      yb = a.y + a.h - 20;
+      band = (x1 - x0) / K;
+      thick = Math.min(band * 0.58, 56);
+    } else {
+      var labW = 0;
+      cfg.categories.forEach(function(c) { labW = Math.max(labW, ctx.measureText(c).width); });
+      labW = Math.min(labW, a.w * 0.36);
+      x0 = a.x + labW + 8;
+      yt = a.y + 4;
+      yb = a.y + a.h - 18;
+      band = (yb - yt) / K;
+      d = Math.min(14, band * 0.4) * this.view.depth;
+      dx = d * Math.cos(this.view.angle); dy = -d * Math.sin(this.view.angle);
+      yt -= dy;
+      band = (yb - yt) / K;
+      x1 = a.x + a.w - dx - 46;
+      thick = Math.min(band * 0.62, 30);
+    }
+    function pos(v) { return horiz ? x0 + v / scale.max * (x1 - x0) : yb - v / scale.max * (yb - yt); }
+
+    /* floor, back wall grid and value axis */
+    ctx.textBaseline = "middle";
+    if (!horiz) {
+      c3dPoly(ctx, [[x0, yb], [x1, yb], [x1 + dx, yb + dy], [x0 + dx, yb + dy]], C3D.floor, null);
+      ticks.forEach(function(t) {
+        var y = pos(t);
+        ctx.beginPath();
+        ctx.moveTo(x0, y); ctx.lineTo(x0 + dx, y + dy); ctx.lineTo(x1 + dx, y + dy);
+        ctx.strokeStyle = C3D.grid; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = C3D.muted; ctx.textAlign = "right";
+        ctx.fillText(fmtAxis(t), x0 - 6, y);
+      });
+    } else {
+      c3dPoly(ctx, [[x0, yt], [x0, yb], [x0 + dx, yb + dy], [x0 + dx, yt + dy]], C3D.floor, null);
+      ticks.forEach(function(t) {
+        var x = pos(t);
+        ctx.beginPath();
+        ctx.moveTo(x, yb); ctx.lineTo(x + dx, yb + dy); ctx.lineTo(x + dx, yt + dy);
+        ctx.strokeStyle = C3D.grid; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = C3D.muted; ctx.textAlign = "center"; ctx.textBaseline = "top";
+        ctx.fillText(fmtAxis(t), x, yb + 5);
+      });
+    }
+
+    /* boxes: vertical left to right, horizontal bottom row first, so nearer faces paint last */
+    var dim = act !== null;
+    for (var n = 0; n < K; n++) {
+      k = horiz ? K - 1 - n : n;
+      var base = 0, cat = cfg.categories[k];
+      var start = horiz ? yt + band * k + (band - thick) / 2 : x0 + band * k + (band - thick) / 2;
+      vis.forEach(function(i) {
+        var val = Math.max(cfg.series[i].data[k] || 0, 0);
+        if (!(val > 0)) return;
+        var key = i + ":" + k, hot = key === act, polys, v0 = pos(base * p), v1 = pos((base + val) * p);
+        ctx.globalAlpha = dim && !hot ? 0.55 : 1;
+        polys = horiz ? c3dBox(ctx, v0, start, v1 - v0, thick, dx, dy, cfg.series[i].color, hot)
+                      : c3dBox(ctx, start, v1, thick, v0 - v1, dx, dy, cfg.series[i].color, hot);
+        ctx.globalAlpha = 1;
+        self.marks.push({ key: key, polys: polys,
+                          cx: horiz ? (v0 + v1) / 2 : start + thick / 2, cy: horiz ? start + thick / 2 : (v0 + v1) / 2 });
+        base += val;
+      });
+      /* selective direct label: the stack total at the end of each bar */
+      ctx.fillStyle = C3D.ink2;
+      ctx.font = "11px " + C3D.font;
+      if (totals[k] > 0 && p === 1) {
+        if (!horiz && band >= 40) {
+          ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+          ctx.fillText(c3dFit(ctx, cfg.format(totals[k]), band + 8), start + thick / 2 + dx / 2, pos(totals[k]) + dy - 3);
+        } else if (horiz && band >= 13) {
+          ctx.textAlign = "left"; ctx.textBaseline = "middle";
+          ctx.fillText(cfg.format(totals[k]), pos(totals[k]) + dx + 5, start + thick / 2 + dy / 2);
+        }
+      }
+      /* category labels */
+      ctx.fillStyle = C3D.ink2;
+      if (!horiz) {
+        var every = Math.ceil(34 / band);
+        if (k % every === 0) {
+          ctx.textAlign = "center"; ctx.textBaseline = "top";
+          ctx.fillText(c3dFit(ctx, cat, band * every - 4), start + thick / 2, yb + 6);
+        }
+      } else if (band >= 11) {
+        ctx.textAlign = "right"; ctx.textBaseline = "middle";
+        ctx.fillText(c3dFit(ctx, cat, x0 - a.x - 8), x0 - 6, start + thick / 2);
+      }
+    }
+    for (k = 0; k < K; k++) vis.forEach(function(i) { if ((cfg.series[i].data[k] || 0) > 0) self.order.push(i + ":" + k); });
+  };
+
+  /* ---------------- tooltip ---------------- */
+  Chart3D.prototype.keyItem = function(key) {
+    return key === null ? null : (key.charAt(0) === "s" ? +key.slice(1) : +key.split(":")[0]);
+  };
+
+  Chart3D.prototype.drawTooltip = function() {
+    var key = this.activeKey(), cfg = this.cfg, ctx = this.ctx, self = this;
+    if (key === null) return;
+    var mark = this.marks.filter(function(m) { return m.key === key; })[0];
+    if (!mark) return;
+    var title = null, rows = [];
+    if (cfg.type === "donut") {
+      var total = 0, s = cfg.slices[this.keyItem(key)];
+      cfg.slices.forEach(function(x, i) { if (!self.hidden[i] && x.value > 0) total += x.value; });
+      rows.push({ color: s.color, value: cfg.format(s.value), label: s.label + " (" + (s.value / total * 100).toFixed(1) + "%)", on: true });
+    } else {
+      var k = +key.split(":")[1], si = this.keyItem(key), sum = 0, count = 0;
+      title = cfg.categories[k];
+      cfg.series.forEach(function(x, i) {
+        var val = x.data[k] || 0;
+        if (self.hidden[i] || !(val > 0)) return;
+        rows.push({ color: x.color, value: cfg.format(val), label: x.label, on: i === si });
+        sum += val; count++;
+      });
+      if (count > 1) rows.push({ color: null, value: cfg.format(sum), label: "Total", on: false });
+    }
+    var w = 0, lineH = 18, pad = 10;
+    rows.forEach(function(r) {
+      ctx.font = "600 12px " + C3D.font;
+      r.vw = ctx.measureText(r.value).width;
+      ctx.font = (r.on ? "600 " : "") + "12px " + C3D.font;
+      w = Math.max(w, 18 + r.vw + 6 + ctx.measureText(r.label).width);
+    });
+    if (title) { ctx.font = "600 11px " + C3D.font; w = Math.max(w, ctx.measureText(title).width); }
+    var h = rows.length * lineH + (title ? 18 : 0) + pad * 2 - 4;
+    w = Math.min(w + pad * 2, this.w - 8);
+    var px = this.pointer && this.hover === key && this.focus === null ? this.pointer.x : mark.cx;
+    var py = this.pointer && this.hover === key && this.focus === null ? this.pointer.y : mark.cy;
+    var x = px + 14, y = py - h - 10;
+    if (x + w > this.w - 4) x = px - w - 14;
+    if (x < 4) x = 4;
+    if (y < 4) y = py + 16;
+    if (y + h > this.h - 4) y = this.h - 4 - h;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.16)";
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+    c3dRoundRect(ctx, x, y, w, h, 8);
+    ctx.fillStyle = C3D.surface;
+    ctx.fill();
+    ctx.restore();
+    c3dRoundRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, 8);
+    ctx.strokeStyle = C3D.grid;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    var cy = y + pad + 4;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    if (title) {
+      ctx.font = "600 11px " + C3D.font;
+      ctx.fillStyle = C3D.muted;
+      ctx.fillText(c3dFit(ctx, title, w - pad * 2), x + pad, cy);
+      cy += 18;
+    }
+    rows.forEach(function(r) {
+      if (r.color) {
+        ctx.beginPath();
+        ctx.moveTo(x + pad, cy); ctx.lineTo(x + pad + 12, cy);
+        ctx.strokeStyle = r.color; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.stroke();
+        ctx.lineCap = "butt";
+      }
+      ctx.font = "600 12px " + C3D.font;
+      ctx.fillStyle = C3D.ink;
+      ctx.fillText(r.value, x + pad + 18, cy);
+      ctx.font = (r.on ? "600 " : "") + "12px " + C3D.font;
+      ctx.fillStyle = r.on ? C3D.ink : C3D.ink2;
+      ctx.fillText(c3dFit(ctx, r.label, w - pad * 2 - 24 - r.vw + 1), x + pad + 18 + r.vw + 6, cy);
+      cy += lineH;
+    });
+  };
+
+  Chart3D.prototype.updateAria = function() {
+    var cfg = this.cfg, self = this, parts = [];
+    if (cfg.type === "donut") {
+      cfg.slices.forEach(function(s, i) { if (!self.hidden[i] && s.value > 0) parts.push(s.label + " " + cfg.format(s.value)); });
+    } else {
+      cfg.categories.forEach(function(c, k) {
+        var vals = [];
+        cfg.series.forEach(function(s, i) { if (!self.hidden[i] && (s.data[k] || 0) > 0) vals.push(s.label + " " + cfg.format(s.data[k])); });
+        if (vals.length) parts.push(c + ": " + vals.join(", "));
+      });
+    }
+    var label = cfg.title + ". " + parts.join("; ") + ". Use the arrow keys to read each value.";
+    if (this.canvas.getAttribute("aria-label") !== label) this.canvas.setAttribute("aria-label", label);
+  };
+
+  /* ---------------- interaction ---------------- */
+  Chart3D.prototype.at = function(e) {
+    var r = this.canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (this.w / (r.width || 1)), y: (e.clientY - r.top) * (this.h / (r.height || 1)) };
+  };
+
+  Chart3D.prototype.hit = function(p) {
+    for (var b = 0; b < this.legendBoxes.length; b++) {
+      var lb = this.legendBoxes[b];
+      if (p.x >= lb.x - 4 && p.x <= lb.x + lb.w + 4 && p.y >= lb.y && p.y <= lb.y + lb.h) return { legend: lb.i };
+    }
+    for (var m = this.marks.length - 1; m >= 0; m--) {
+      for (var q = 0; q < this.marks[m].polys.length; q++) {
+        if (c3dInPoly(p.x, p.y, this.marks[m].polys[q])) return { key: this.marks[m].key };
+      }
+    }
+    return null;
+  };
+
+  Chart3D.prototype.onMove = function(e) {
+    var p = this.at(e), v = this.view;
+    this.pointer = p;
+    if (this.drag) {
+      var dxp = p.x - this.drag.x, dyp = p.y - this.drag.y;
+      this.drag.x = p.x; this.drag.y = p.y;
+      this.drag.dist += Math.abs(dxp) + Math.abs(dyp);
+      if (this.drag.dist > 4) this.drag.moved = true;
+      if (!this.drag.moved) return;
+      if (this.cfg.type === "donut") {
+        v.rot += dxp * 0.012;
+        v.tilt = Math.min(1.35, Math.max(0.35, v.tilt - dyp * 0.008));
+      } else {
+        v.angle = Math.min(1.4, Math.max(0.12, v.angle - dxp * 0.01));
+        v.depth = Math.min(2.2, Math.max(0.3, v.depth - dyp * 0.012));
+      }
+      this.draw();
+      return;
+    }
+    var h = this.hit(p), key = h && h.key !== undefined ? h.key : null;
+    this.canvas.style.cursor = h ? "pointer" : "grab";
+    this.hover = key;
+    this.draw();
+  };
+
+  Chart3D.prototype.onLeave = function() {
+    if (this.drag) return;
+    this.pointer = null;
+    this.hover = null;
+    this.canvas.style.cursor = "";
+    this.draw();
+  };
+
+  Chart3D.prototype.onDown = function(e) {
+    var p = this.at(e), h = this.hit(p);
+    this.focus = null;
+    if (h && h.legend !== undefined) {
+      this.hidden[h.legend] = !this.hidden[h.legend];
+      this.hover = null;
+      this.draw();
+      return;
+    }
+    this.drag = { x: p.x, y: p.y, dist: 0, moved: false, key: h ? h.key : null };
+    if (e.pointerType === "mouse") this.canvas.style.cursor = h ? "pointer" : "grabbing";
+  };
+
+  Chart3D.prototype.onUp = function(e) {
+    if (!this.drag) return;
+    var d = this.drag;
+    this.drag = null;
+    /* a tap without dragging pins the tooltip (touch has no hover) */
+    if (!d.moved && e && e.pointerType !== "mouse") this.hover = d.key;
+    this.draw();
+  };
+
+  Chart3D.prototype.onKey = function(e) {
+    var keys = this.order, i = keys.indexOf(this.focus);
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") i = i < 0 ? 0 : (i + 1) % keys.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") i = i <= 0 ? keys.length - 1 : i - 1;
+    else if (e.key === "Home") i = 0;
+    else if (e.key === "End") i = keys.length - 1;
+    else if (e.key === "Escape") i = -1;
+    else return;
+    e.preventDefault();
+    this.focus = i >= 0 && keys.length ? keys[i] : null;
+    this.draw();
+  };
+
+  /* ================================================================
      CHARTS
      ================================================================ */
+  const cores = v => (+v.toFixed(1)) + " cores";
+
   function drawCoreChart(workload, mgmt, ha, available) {
     const unused   = Math.max(available - workload, 0);
     const overflow = Math.max(workload - available, 0);
 
-    const labels = [], data = [], colors = [];
-    labels.push("Workload Cores");   data.push(Math.min(workload, available)); colors.push("rgba(0,122,255,.75)");
-    if (unused > 0)   { labels.push("Available (Unused)");       data.push(unused);   colors.push("rgba(52,199,89,.75)"); }
-    if (overflow > 0) { labels.push("Overflow (Insufficient)");  data.push(overflow); colors.push("rgba(255,59,48,.75)"); }
-    labels.push("Management Overhead"); data.push(mgmt); colors.push("rgba(175,175,175,.75)");
-    if (ha > 0) { labels.push("HA Reserved (1 Node)"); data.push(ha); colors.push("rgba(90,200,250,.75)"); }
-
-    const cfg = {
-      type: "doughnut",
-      data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 1 }] },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { title: { display: true, text: "Cluster Core Allocation", font: { size: 14 } }, legend: { position: "bottom", labels: { boxWidth: 12 } } }
-      }
-    };
     if (coreChart) coreChart.destroy();
-    coreChart = new Chart($("coreChart").getContext("2d"), cfg);
+    coreChart = new Chart3D($("coreChart"), {
+      type: "donut", title: "Cluster Core Allocation", format: cores,
+      slices: [
+        { label: "Workload Cores",       value: Math.min(workload, available), color: C3D_COLORS.blue },
+        { label: "Management Overhead",  value: mgmt,   color: C3D_COLORS.orange },
+        { label: "Available (Unused)",   value: unused, color: C3D_COLORS.aqua },
+        { label: "HA Reserved (1 Node)", value: ha,     color: C3D_COLORS.violet }
+      ],
+      /* Overflow is demand above capacity, not a part of the cluster, so the center reports it */
+      center: () => overflow > 0
+        ? { value: "Short by " + overflow + " cores", label: "Insufficient capacity", critical: true }
+        : { value: (available > 0 ? Math.round(workload / available * 100) : 0) + "%", label: "Core utilization" }
+    });
   }
 
   function drawNodeChart(nodes, coresPerNode, mgmtPerNode, availPerNode, totalWorkloadCores, workloadNodes, haEnabled) {
@@ -657,9 +1366,9 @@
     const workloadPerNode = workloadNodes > 0 ? Math.ceil(totalWorkloadCores / workloadNodes) : 0;
 
     for (let i = 1; i <= nodes; i++) {
-      labels.push("Node " + i);
-      mgmtData.push(mgmtPerNode);
       const isHA = haEnabled && nodes > 1 && i === nodes;
+      labels.push("Node " + i + (isHA ? " (HA)" : ""));
+      mgmtData.push(mgmtPerNode);
       if (isHA) {
         workloadData.push(0);
         freeData.push(availPerNode);
@@ -670,24 +1379,16 @@
       }
     }
 
-    const cfg = {
-      type: "bar",
-      data: {
-        labels,
-        datasets: [
-          { label: "Management", data: mgmtData, backgroundColor: "rgba(175,175,175,.75)", stack: "s" },
-          { label: "VM Workload", data: workloadData, backgroundColor: "rgba(0,122,255,.75)", stack: "s" },
-          { label: "Free", data: freeData, backgroundColor: "rgba(52,199,89,.75)", stack: "s" }
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { title: { display: true, text: "Per-Node Core Distribution", font: { size: 14 } }, legend: { position: "bottom", labels: { boxWidth: 12 } } },
-        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: "Cores" } } }
-      }
-    };
     if (nodeChart) nodeChart.destroy();
-    nodeChart = new Chart($("nodeChart").getContext("2d"), cfg);
+    nodeChart = new Chart3D($("nodeChart"), {
+      type: "bar", title: "Per-Node Core Distribution", categories: labels,
+      format: cores, axisFormat: v => String(+v.toFixed(1)),
+      series: [
+        { label: "Management",  color: C3D_COLORS.orange, data: mgmtData },
+        { label: "VM Workload", color: C3D_COLORS.blue,   data: workloadData },
+        { label: "Free",        color: C3D_COLORS.aqua,   data: freeData }
+      ]
+    });
   }
 
   /* ================================================================

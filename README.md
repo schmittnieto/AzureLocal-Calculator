@@ -27,7 +27,7 @@ Estimates raw, effective, and usable storage capacity based on cluster configura
 - Storage types: Full-Flash (NVMe/SSD), 2-Tier (Cache + Capacity), 3-Tier (Cache + Performance + Capacity)
 - Resiliency options per platform and node count (Mirror, Parity, Mirror-Accelerated Parity)
 - Detailed results with raw, effective, and usable capacity breakdown
-- Interactive Chart.js visualizations
+- Interactive 3D charts (capacity donut, volume distribution) with tooltips, clickable legend and drag to rotate
 - PDF export and browser print support
 
 ---
@@ -49,7 +49,7 @@ Estimates the physical CPU requirements for a given virtual workload across an A
 - N+1 High Availability capacity reservation toggle
 - Management overhead and vCPU-to-core ratio configuration
 - CPU recommendation cards showing fit, tight, or insufficient status
-- Interactive Chart.js visualizations
+- Interactive 3D charts (core allocation donut, per-node distribution) with tooltips, clickable legend and drag to rotate
 - PDF export and browser print support
 
 ---
@@ -84,8 +84,21 @@ Estimates the total cost of ownership (TCO) for an Azure Local deployment, inclu
   - Azure Virtual Desktop (AVD): vCPUs and monthly usage hours
   - SQL Managed Instance (SQLmi): vCores, usage hours, tier (General Purpose / Business Critical), licensing model (License Included / Azure Hybrid Benefit), and reservation term (PAYG / 1-Year RI / 3-Year RI)
 - Full cost overview table with one-time and monthly breakdown
-- Interactive Chart.js visualizations: total cost, one-time breakdown, monthly breakdown
+- Interactive 3D charts: total cost, one-time breakdown, monthly breakdown, with tooltips, clickable legend and drag to rotate
 - PDF export and browser print support
+
+---
+
+## 3D Charts
+
+The V2 calculators draw their charts with a small 3D renderer that is built into each HTML file, so every calculator is a single self-contained file without external libraries. The charts support:
+
+- **Hover or tap** on a slice or bar to see its value, its share and, for stacked bars, every value of that category plus the total
+- **Click a legend entry** to hide or show that part of the chart
+- **Drag** to rotate the view (donuts: turn and tilt, bars: change the depth angle) and **double-click** to reset it
+- **Keyboard**: focus a chart with Tab and use the arrow keys to read each value, Escape to close the tooltip
+
+Colors are assigned per entity and stay the same in every chart (for example, Windows licensing has the same color in both pricing charts). The palette was checked for color vision deficiency separation, and every value is also shown in the legend or the Full Overview table, so no information depends on color or hover alone.
 
 ---
 
