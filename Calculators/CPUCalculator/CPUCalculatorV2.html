@@ -123,6 +123,11 @@
     <h3>Cluster Settings</h3>
     <div class="form-grid">
       <div class="form-group">
+        <label for="nodeType">Node Type (Azure Local catalog)</label>
+        <select id="nodeType"></select>
+        <div id="nodeTypeInfo" style="font-size:.82em;margin-top:6px"></div>
+      </div>
+      <div class="form-group">
         <label for="socketsPerNode">CPU Sockets per Node</label>
         <select id="socketsPerNode">
           <option value="1">Single Socket (1)</option>
@@ -193,7 +198,7 @@
   <!-- CPU Recommendations -->
   <div id="cpuRecommendSection" class="card" style="display:none">
     <h3>CPU Recommendations</h3>
-    <p style="font-size:.85em;margin:0 0 4px">Based on the minimum cores required per socket, these are common server CPUs that could fit your workload.</p>
+    <p id="cpuRecommendIntro" style="font-size:.85em;margin:0 0 4px">Based on the minimum cores required per socket, these are common server CPUs that could fit your workload.</p>
     <p style="font-size:.82em;margin:0 0 10px;font-weight:600">Important: CPU availability depends on your OEM/server platform. Always confirm with your hardware vendor before purchasing. Newer generations offer better IPC and efficiency, enabling higher vCPU:core ratios.</p>
     <div id="cpuGrid" class="cpu-grid"></div>
   </div>
@@ -339,9 +344,73 @@
     { name: "AMD EPYC 9965",  vendor: "AMD", gen: "5th Gen (Turin Dense)", cores: 192, tdp: 500 }
   ];
 
+  /* ================================================================
+     AZURE LOCAL CATALOG NODE TYPES
+     Systems listed as "Current (2026 or later)" in the Azure Local
+     solutions catalog (https://azurelocalsolutions.azure.microsoft.com/#/catalog).
+     The catalog publishes the CPU generation and the supported cores per
+     socket of each system, not individual CPU models. "note" explains
+     values that had to be inferred because the catalog entry was incomplete.
+     ================================================================ */
+  const CATALOG_DATE = "2026-10-01";
+  const nodeTypes = [
+    { vendor: "Armada", name: "Galleon - Cruiser", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Armada", name: "Galleon - Triton", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "DataON", name: "DataON AZL-8208i Intel Xeon 6", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 16, 24, 32], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
+    { vendor: "DataON", name: "DataON AZL-8224i Intel Xeon 6", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 16, 24, 32], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
+    { vendor: "DataON", name: "DataON AZS-8112a 5th Gen AMD EPYC", family: "AMD", model: "5th Gen EPYC", sockets: 1, cores: [8, 16, 24, 32, 36, 48], maxCores: 48, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "core options above the system maximum (48 cores) removed" },
+    { vendor: "Dell Technologies", name: "AX-4000r/z with AX-4510c", family: "Intel", model: "Xeon D 27xx", sockets: 1, cores: [8, 16, 20], maxCores: 20, nodes: [1, 16], form: "Rugged", arch: "Hyperconverged", note: "" },
+    { vendor: "Dell Technologies", name: "AX-4000r/z with AX-4520c", family: "Intel", model: "Xeon D 27xx", sockets: 1, cores: [8, 16, 20], maxCores: 20, nodes: [1, 16], form: "Rugged", arch: "Hyperconverged", note: "" },
+    { vendor: "Dell Technologies", name: "AX-660", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 20, 24, 28, 32, 40, 48, 52, 56, 60], maxCores: 120, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "core options above the system maximum (120 cores) removed" },
+    { vendor: "Dell Technologies", name: "AX-670", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Dell Technologies", name: "AX-760", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 20, 24, 28, 32, 40, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Dell Technologies", name: "AX-770", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Dell Technologies", name: "PowerEdge R660, enabled with Dell Private Cloud", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Dell Technologies", name: "PowerEdge R670, enabled with Dell Private Cloud", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Dell Technologies", name: "PowerEdge R760, enabled with Dell Private Cloud", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Dell Technologies", name: "PowerEdge R770, enabled with Dell Private Cloud", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant Compute DL360 Gen12 Server Premier Solution", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
+    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant Compute DL380 Gen12 Server Premier Solution", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
+    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant DL145 Gen11 Server Premier Solution", family: "AMD", model: "5th Gen EPYC", sockets: 1, cores: [16, 24, 32, 48, 64, 84], maxCores: 84, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant DL380 Gen11 Server Premier Solution for Azure Local", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
+    { vendor: "Hitachi", name: "Hitachi Advanced Server HA810 G6", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Hitachi", name: "Hitachi Advanced Server HA820 G6", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Lenovo", name: "ThinkAgile FX630 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile FX650 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX455 V3 Edge PR", family: "AMD", model: "4th Gen EPYC", sockets: 1, cores: [8, 16, 24, 32, 48, 64], maxCores: 64, nodes: [1, 4], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX630 V3 CN Node", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX630 V3 Integrated System", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX630 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX650 V3 CN Node", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX650 V3 Integrated System", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX650 V3 PR Node", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX650 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX650a V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" }
+  ];
+
+  /* cpuDatabase generations that belong to each catalog CPU generation */
+  const catalogGenerations = {
+    "Intel 6th Gen Xeon Scalable": ["Xeon 6 P-core (Granite Rapids)", "Xeon 6 E-core (Sierra Forest)"],
+    "Intel 5th Gen Xeon Scalable": ["5th Gen (Emerald Rapids)"],
+    "Intel Xeon D 27xx": [],
+    "AMD 5th Gen EPYC": ["5th Gen (Turin)", "5th Gen (Turin Dense)"],
+    "AMD 4th Gen EPYC": ["4th Gen (Genoa)"]
+  };
+  const nodeCpuLabel = p => p.family + " " + p.model;
+  const selectedNodeType = () => { const v = $("nodeType").value; return v === "" ? null : nodeTypes[+v]; };
+  /* Known CPU models of the node type's generation with exactly this core count (examples only) */
+  const exampleCpus = (p, cores) => cpuDatabase.filter(c => c.cores === cores && (catalogGenerations[nodeCpuLabel(p)] || []).includes(c.gen));
+  /* A catalog core option used as a CPU in "I know my CPU" mode */
+  const catalogCpu = (p, cores) => ({ name: nodeCpuLabel(p) + ", " + cores + " cores/socket", vendor: p.family, gen: nodeCpuLabel(p) + " on " + p.name, cores, tdp: null });
+
   /* CPU imported from ODIN (not part of the recommendation list) */
   let importedCpu = null;
-  const findCpu = name => (importedCpu && importedCpu.name === name) ? importedCpu : cpuDatabase.find(c => c.name === name);
+  const findCpu = name => {
+    if (importedCpu && importedCpu.name === name) return importedCpu;
+    const p = selectedNodeType();
+    if (p && name.indexOf("cat:") === 0) return catalogCpu(p, +name.slice(4));
+    return cpuDatabase.find(c => c.name === name);
+  };
 
   /* ---- chart instances ---- */
   let coreChart = null, nodeChart = null;
@@ -364,35 +433,94 @@
 
   /* ================================================================
      POPULATE CPU DROPDOWN
+     Without a node type: every CPU of the database. With a node type:
+     the catalog core options of that system plus matching example models.
      ================================================================ */
-  (function populateDropdown() {
-    const sel = $("cpuSelect");
-    const grouped = {};
-    for (const cpu of cpuDatabase) {
-      const key = cpu.vendor + " - " + cpu.gen;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(cpu);
-    }
-    for (const [group, cpus] of Object.entries(grouped)) {
+  function fillCpuSelect() {
+    const sel = $("cpuSelect"), prev = sel.value, p = selectedNodeType();
+    const odin = sel.querySelector("optgroup[data-odin]");
+    sel.innerHTML = "";
+    if (odin) sel.appendChild(odin);
+    const add = (label, items) => {
+      if (!items.length) return;
       const og = document.createElement("optgroup");
-      og.label = group;
-      for (const cpu of cpus) {
+      og.label = label;
+      for (const [value, text] of items) {
         const opt = document.createElement("option");
-        opt.value = cpu.name;
-        opt.textContent = cpu.name + " (" + cpu.cores + " cores)";
+        opt.value = value;
+        opt.textContent = text;
+        og.appendChild(opt);
+      }
+      sel.appendChild(og);
+    };
+    if (p) {
+      add(p.name + ": catalog core options", p.cores.map(n => ["cat:" + n, nodeCpuLabel(p) + ", " + n + " cores/socket"]));
+      add("Matching CPU models (examples)", p.cores.flatMap(n => exampleCpus(p, n)).map(c => [c.name, c.name + " (" + c.cores + " cores)"]));
+    } else {
+      const grouped = {};
+      for (const cpu of cpuDatabase) {
+        const key = cpu.vendor + " - " + cpu.gen;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push([cpu.name, cpu.name + " (" + cpu.cores + " cores)"]);
+      }
+      for (const [group, items] of Object.entries(grouped)) add(group, items);
+    }
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+    sel.dispatchEvent(new Event("change"));
+  }
+
+  /* show info on change */
+  $("cpuSelect").addEventListener("change", function () {
+    const cpu = findCpu(this.value);
+    $("cpuSelectInfo").textContent = cpu
+      ? cpu.cores + " cores/socket | " + cpu.gen + (cpu.tdp ? " | TDP " + cpu.tdp + "W" : "")
+      : "";
+  });
+
+  /* ================================================================
+     NODE TYPE (Azure Local catalog)
+     ================================================================ */
+  (function initNodeTypes() {
+    const sel = $("nodeType");
+    const any = document.createElement("option");
+    any.value = "";
+    any.textContent = "Any server (no catalog filter)";
+    sel.appendChild(any);
+    const vendors = {};
+    nodeTypes.forEach((p, i) => { (vendors[p.vendor] = vendors[p.vendor] || []).push(i); });
+    for (const vendor of Object.keys(vendors)) {
+      const og = document.createElement("optgroup");
+      og.label = vendor;
+      for (const i of vendors[vendor]) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = nodeTypes[i].name + " (" + nodeCpuLabel(nodeTypes[i]) + ")";
         og.appendChild(opt);
       }
       sel.appendChild(og);
     }
-    /* show info on change */
-    sel.addEventListener("change", function () {
-      const cpu = findCpu(this.value);
-      if (cpu) {
-        $("cpuSelectInfo").textContent = cpu.cores + " cores/socket | " + cpu.gen + (cpu.tdp ? " | TDP " + cpu.tdp + "W" : "");
-      }
-    });
-    sel.dispatchEvent(new Event("change"));
+    sel.addEventListener("change", applyNodeType);
   })();
+
+  /* Limits sockets and node count to the selected system and refreshes the CPU list */
+  function applyNodeType() {
+    const p = selectedNodeType(), sockets = $("socketsPerNode"), nodeCount = $("nodeCount");
+    const dual = sockets.querySelector('option[value="2"]');
+    dual.disabled = !!p && p.sockets < 2;
+    if (dual.disabled) sockets.value = "1";
+    nodeCount.min = p ? p.nodes[0] : 1;
+    nodeCount.max = p ? p.nodes[1] : 16;
+    $("nodeTypeInfo").textContent = p
+      ? [p.form + ", " + p.arch,
+         p.nodes[0] + " to " + p.nodes[1] + " nodes",
+         "up to " + p.sockets + " socket" + (p.sockets > 1 ? "s" : ""),
+         nodeCpuLabel(p) + ": " + p.cores.join(", ") + " cores per socket"].join(" | ") +
+        (p.note ? ". Note: " + p.note : "") + ". Source: Azure Local catalog, " + CATALOG_DATE + "."
+      : "";
+    fillCpuSelect();
+  }
+
+  fillCpuSelect();
 
   /* ================================================================
      SHARED: read common inputs
@@ -445,6 +573,7 @@
     html += "<strong>Minimum Cores per Socket:</strong> " + minCoresPerSocket + " cores<br>";
     html += "<strong>Nodes for Workloads:</strong> " + workloadNodes + " of " + nodes + (haEnabled ? " (1 reserved for HA)" : "") + "<br>";
     html += "<strong>Max vCPUs Supported:</strong> " + maxVCPUs + " vCPUs<br>";
+    html += nodeTypeChecks(nodes, minCoresPerSocket);
     if (fits) {
       html += '<span class="ok">The cluster has sufficient CPU capacity with ' + minCoresPerSocket + '+ core sockets.</span>';
     } else {
@@ -510,7 +639,8 @@
     html += "<strong>Available Cores per Node (for VMs):</strong> " + availableCoresPerNode + " cores<br>";
     html += '<strong>Minimum Nodes Required:</strong> <span class="ok">' + minNodes + " nodes</span>" + (haEnabled ? " (includes +1 for HA)" : "") + "<br>";
     html += "<strong>Max vCPUs Supported (" + minNodes + " nodes):</strong> " + maxVCPUs + " vCPUs<br>";
-    html += "<strong>Core Utilization:</strong> " + utilization.toFixed(1) + "%";
+    html += "<strong>Core Utilization:</strong> " + utilization.toFixed(1) + "%<br>";
+    html += nodeTypeChecks(minNodes, null);
     rb.innerHTML = html;
 
     /* hide CPU recommendation grid (not relevant in this mode) */
@@ -535,14 +665,47 @@
   }
 
   /* ================================================================
+     NODE TYPE CHECKS (result box lines)
+     ================================================================ */
+  function nodeTypeChecks(nodes, minCoresPerSocket) {
+    const p = selectedNodeType();
+    if (!p) return "";
+    let html = "<strong>Node Type:</strong> " + p.vendor + " " + p.name + " (" + nodeCpuLabel(p) + ")<br>";
+    if (nodes < p.nodes[0] || nodes > p.nodes[1]) {
+      html += '<span class="warning">' + nodes + " nodes is outside the supported scale of this node type (" + p.nodes[0] + " to " + p.nodes[1] + " nodes).</span><br>";
+    }
+    if (minCoresPerSocket !== null) {
+      const option = p.cores.find(n => n >= minCoresPerSocket);
+      html += option
+        ? "<strong>Smallest Catalog Option That Fits:</strong> " + option + " cores per socket<br>"
+        : '<span class="warning">No CPU option of this node type has ' + minCoresPerSocket + "+ cores per socket (largest: " + p.cores[p.cores.length - 1] + "). Add nodes or choose another node type.</span><br>";
+    }
+    return html;
+  }
+
+  /* ================================================================
      CPU RECOMMENDATIONS
      ================================================================ */
+  const defaultRecommendIntro = $("cpuRecommendIntro").textContent;
+
   function buildCpuRecommendations(minCores) {
     $("cpuRecommendSection").style.display = "block";
-    const grid = $("cpuGrid");
+    const grid = $("cpuGrid"), p = selectedNodeType();
+
+    /* with a node type the cards are the catalog core options of that system */
+    $("cpuRecommendIntro").textContent = p
+      ? "Based on the minimum cores required per socket, these are the core options the Azure Local catalog lists for " + p.name +
+        " (" + nodeCpuLabel(p) + "). Example CPU models are shown where this calculator knows a model of that generation with the same core count."
+      : defaultRecommendIntro;
+    const items = p
+      ? p.cores.map(n => {
+          const ex = exampleCpus(p, n);
+          return { name: n + " cores per socket", cores: n, detail: nodeCpuLabel(p) + (ex.length ? " | e.g. " + ex.map(c => c.name).join(", ") : "") };
+        })
+      : cpuDatabase.map(cpu => ({ name: cpu.name, cores: cpu.cores, detail: cpu.cores + " cores/socket | " + cpu.gen + " | TDP " + cpu.tdp + "W" }));
 
     /* sort: best fit first, then by cores ascending */
-    const sorted = [...cpuDatabase].sort((a, b) => {
+    const sorted = items.sort((a, b) => {
       const aFit = a.cores >= minCores ? 0 : 1;
       const bFit = b.cores >= minCores ? 0 : 1;
       if (aFit !== bFit) return aFit - bFit;
@@ -559,9 +722,7 @@
 
       html += '<div class="cpu-card ' + cls + '">';
       html += '<div class="cpu-name">' + cpu.name + tag + '</div>';
-      html += '<div class="cpu-detail">';
-      html += cpu.cores + ' cores/socket | ' + cpu.gen + ' | TDP ' + cpu.tdp + 'W';
-      html += '</div></div>';
+      html += '<div class="cpu-detail">' + cpu.detail + '</div></div>';
     }
     grid.innerHTML = html;
   }
@@ -584,6 +745,10 @@
     row("Physical Cores Required", d.totalVCPUs + " vCPUs / " + d.overcommit + ":1 ratio", d.workloadCores + " cores");
 
     sec("Cluster Configuration");
+    const nodeType = selectedNodeType();
+    if (nodeType) {
+      row("Node Type", "Azure Local catalog (" + CATALOG_DATE + ")", nodeType.vendor + " " + nodeType.name);
+    }
     if (d.cpuName) {
       row("Selected CPU", "User-selected", d.cpuName);
     }
@@ -1793,6 +1958,12 @@
 
   function applyOdinConfig(cfg, fileName) {
     const applied = [], notes = [];
+
+    if (selectedNodeType()) {
+      $("nodeType").value = "";
+      applyNodeType();
+      notes.push("The node type filter was cleared, because the ODIN design defines its own CPU.");
+    }
 
     if (cfg.totals && cfg.totals.vcpus > 0) {
       const total = Math.ceil(cfg.totals.vcpus * cfg.growthFactor);

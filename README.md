@@ -45,6 +45,7 @@ Estimates the physical CPU requirements for a given virtual workload across an A
 - Two calculation modes:
   - **Nodes to CPU**: provide the number of nodes and get CPU model recommendations
   - **CPU to Nodes**: select a CPU model and get the recommended number of nodes
+- **Node Type** selector with the systems listed as "Current (2026 or later)" in the [Azure Local solutions catalog](https://azurelocalsolutions.azure.microsoft.com/#/catalog): limits sockets and node count to the selected system and recommends the cores-per-socket options the catalog publishes for it (with example CPU models where known)
 - CPU socket selector (single socket / dual socket)
 - N+1 High Availability capacity reservation toggle
 - Management overhead and vCPU-to-core ratio configuration
