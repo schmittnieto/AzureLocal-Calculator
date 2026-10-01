@@ -184,6 +184,37 @@
     </div>
   </div>
 
+  <!-- Section 2b: SAN System (L2 deployments with external storage) -->
+  <div class="card" id="pricingV2_sanCard" style="display:none">
+    <h3>SAN System Price</h3>
+    <p style="font-size:.82em;color:inherit;margin:0 0 12px">External SAN storage of the L2 deployment models. The SAN plan of the Storage Calculator fills in the vendor and the capacity.</p>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="pricingV2_sanVendor">SAN Vendor</label>
+        <select id="pricingV2_sanVendor">
+          <option value="Dell">Dell</option>
+          <option value="Everpure">Everpure</option>
+          <option value="Hitachi Vantara">Hitachi Vantara</option>
+          <option value="HPE">HPE</option>
+          <option value="Lenovo">Lenovo</option>
+          <option value="NetApp">NetApp</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="pricingV2_sanCapacity">Physical Usable Capacity (TB)</label>
+        <input type="number" id="pricingV2_sanCapacity" placeholder="e.g., 50" step="0.01" min="0">
+      </div>
+      <div class="form-group">
+        <label for="pricingV2_sanPrice">SAN Array Price (one-time)</label>
+        <input type="number" id="pricingV2_sanPrice" placeholder="e.g., 150000" step="100" min="0">
+      </div>
+      <div class="form-group">
+        <label for="pricingV2_sanSupport">SAN Support and Maintenance (monthly)</label>
+        <input type="number" id="pricingV2_sanSupport" placeholder="e.g., 1000" step="10" min="0">
+      </div>
+    </div>
+  </div>
+
   <!-- Section 3: Related Costs (broken down) -->
   <div class="card">
     <h3>Related Licenses / Costs</h3>
@@ -423,6 +454,7 @@
     for (const id of ["pricingV2_l3MgmtNodesGroup", "pricingV2_l3MgmtCoresGroup", "pricingV2_l3MgmtPriceGroup"]) {
       $(id).style.display = model === "l3" ? "flex" : "none";
     }
+    $("pricingV2_sanCard").style.display = isL2 ? "block" : "none";
     /* AVD isn't a supported service of disconnected operations */
     $("pricingV2_avdVCPUs").disabled = $("pricingV2_avdHours").disabled = model === "l3";
     $("pricingV2_avdNote").style.display = model === "l3" ? "block" : "none";
@@ -447,7 +479,54 @@
       $("pricingV2_customLicenseContainer").style.display = "none";
     }
   });
-  $("pricingV2_deploymentModel").addEventListener("change", updateDeploymentFields);
+  $("pricingV2_deploymentModel").addEventListener("change", function (e) {
+    updateDeploymentFields();
+    if (e.isTrusted) syncPost({ type: "deployment", pricing: this.value });
+  });
+
+  /* ================================================================
+     DEPLOYMENT SYNC (Storage <-> Pricing)
+     A user change of the deployment model is passed to the Storage
+     Calculator (same page or other tabs) and its deployment type comes
+     back here, together with the SAN plan. Received changes are never
+     posted again, so the calculators can't loop.
+     ================================================================ */
+  const SYNC_EVENT = "azurelocal-calculator-sync";
+  let syncChannel = null;
+  try { if (typeof BroadcastChannel === "function") syncChannel = new BroadcastChannel(SYNC_EVENT); } catch (e) {}
+  function syncPost(msg) {
+    msg.source = "pricing";
+    try {
+      if (syncChannel) syncChannel.postMessage(msg);
+      else window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: msg }));
+    } catch (e) {}
+  }
+  /* Storage deployment type -> deployment model, keeping a compatible current model */
+  function modelForStorage(type, current) {
+    if (type === "aldo-mgmt") return "l3";
+    if (type === "disaggregated") return current === "l2-oem" ? current : "l2-disagg";
+    if (type === "hybrid") return current === "l2" || current === "l2-oem" ? current : "l2";
+    /* Storage Spaces Direct only: L1, or a workload cluster of disconnected operations */
+    return current === "l3" ? current : "l1";
+  }
+  function recalcIfShown() {
+    const needsRate = $("pricingV2_deploymentModel").value === "l3" && !(+$("pricingV2_l3HostRate").value > 0);
+    if ($("pricingV2_resultBox").style.display === "block" && !needsRate) calculate();
+  }
+  function onSync(msg) {
+    if (!msg || msg.source === "pricing") return;
+    const sel = $("pricingV2_deploymentModel");
+    if (msg.type === "deployment" && msg.storage) {
+      const model = modelForStorage(msg.storage, sel.value);
+      if (model !== sel.value) { sel.value = model; updateDeploymentFields(); recalcIfShown(); }
+    } else if (msg.type === "san") {
+      if ([...$("pricingV2_sanVendor").options].some(o => o.value === msg.vendor)) $("pricingV2_sanVendor").value = msg.vendor;
+      if (msg.physicalTB > 0) $("pricingV2_sanCapacity").value = msg.physicalTB;
+      recalcIfShown();
+    }
+  }
+  if (syncChannel) syncChannel.addEventListener("message", ev => onSync(ev.data));
+  else window.addEventListener(SYNC_EVENT, ev => onSync(ev.detail));
 
   /* ---- SQL price lookup (per vCore / month) ---- */
   const sqlPrices = {
@@ -485,9 +564,16 @@
     const mgmtCores     = mgmtNodes * mgmtCoresNode;
     const mgmtNodesCost = mgmtNodes * mgmtNodeUnit;
 
+    /* L2: the external SAN system */
+    const isL2 = deploymentModel === "l2" || deploymentModel === "l2-disagg" || deploymentModel === "l2-oem";
+    const sanVendor   = $("pricingV2_sanVendor").value;
+    const sanCapacity = isL2 ? num($("pricingV2_sanCapacity")) : 0;
+    const sanCost     = isL2 ? num($("pricingV2_sanPrice")) : 0;
+    const sanMonthly  = isL2 ? num($("pricingV2_sanSupport")) : 0;
+
     const nodesCost  = nodes * nodeUnit + mgmtNodesCost;
     const switchCost = switches * switchUnit;
-    const hwCost     = nodesCost + switchCost;
+    const hwCost     = nodesCost + switchCost + sanCost;
 
     const coresPerNode = num($("pricingV2_coresPerNode"));
     const totalCores   = nodes * coresPerNode;
@@ -543,7 +629,7 @@
     const sqlCost        = sqlVcores * sqlHourlyRate * sqlHours;
 
     const oneTimeTotal = hwCost + winOneTime + thirdOneTime;
-    const monthlyTotal = hostFee + winMonthly + thirdMonthly + avdCost + sqlCost;
+    const monthlyTotal = hostFee + winMonthly + thirdMonthly + avdCost + sqlCost + sanMonthly;
     const trialApplied = $("pricingV2_applyTrial").checked;
     /* disconnected operations are billed on an annual capacity term, so the trial covers no L3 host fee */
     const trialEligibleMonthly = (isL3 ? 0 : hostFee) + (winLicenseMode === "default" ? winMonthly : 0);
@@ -563,13 +649,14 @@
     /* ---- charts ---- */
     $("pricingV2_chartsSection").style.display = "block";
     drawTotalChart(oneTimeTotal, monthlyTotal, yearlyTotal);
-    drawOneTimeChart(nodesCost, switchCost, winOneTime, thirdOneTime);
-    drawMonthlyChart(hostFee, winMonthly, avdCost, sqlCost, thirdMonthly);
+    drawOneTimeChart(nodesCost, switchCost, winOneTime, thirdOneTime, sanCost);
+    drawMonthlyChart(hostFee, winMonthly, avdCost, sqlCost, thirdMonthly, sanMonthly);
 
     /* ---- overview ---- */
     buildOverview({
       nodes, nodeUnit, nodesCost,
       switches, switchUnit, switchCost, hwCost,
+      isL2, sanVendor, sanCapacity, sanCost, sanMonthly,
       coresPerNode, totalCores, billedCores,
       mgmtNodes, mgmtCoresNode, mgmtCores, mgmtNodeUnit, mgmtNodesCost,
       deploymentModel, deploymentLabel: deployment.label, hostRate,
@@ -610,6 +697,9 @@
     row("Nodes Cost", d.nodes + " nodes x " + fmt(d.nodeUnit) + "/node", fmt(d.nodesCost - d.mgmtNodesCost));
     if (d.mgmtNodes > 0) row("ALDO Management Cluster Nodes", d.mgmtNodes + " nodes x " + fmt(d.mgmtNodeUnit) + "/node", fmt(d.mgmtNodesCost));
     row("Switches Cost", d.switches + " switches x " + fmt(d.switchUnit) + "/switch", fmt(d.switchCost));
+    if (d.isL2) {
+      row("SAN System (" + d.sanVendor + ")", d.sanCapacity > 0 ? d.sanCapacity + " TB physical usable" + (d.sanCost > 0 ? ", " + fmt(d.sanCost / d.sanCapacity) + "/TB" : "") : "External SAN array", fmt(d.sanCost));
+    }
     total("Total Hardware", fmt(d.hwCost));
 
     sec("Licensing");
@@ -634,6 +724,7 @@
     row("Free 60-Day Trial", !d.trialApplied ? "Not applied" : d.deploymentModel === "l3" ? "Windows subscription only (L3 is billed on an annual capacity term)" : "Applied to eligible host and Windows subscription fees", d.trialSavings > 0 ? "-" + fmt(d.trialSavings) : fmt(0));
 
     sec("Related / Third-Party");
+    if (d.isL2) row("SAN Support and Maintenance (monthly)", d.sanVendor + ", user-defined", fmt(d.sanMonthly));
     if (d.backupOTC || d.backupMonth)   { row("Backup (OTC)", "User-defined", fmt(d.backupOTC));   row("Backup (monthly)", "User-defined", fmt(d.backupMonth)); }
     if (d.logsOTC || d.logsMonth)       { row("Logs / Monitoring (OTC)", "User-defined", fmt(d.logsOTC));     row("Logs / Monitoring (monthly)", "User-defined", fmt(d.logsMonth)); }
     if (d.installOTC || d.installMonth) { row("Installation (OTC)", "User-defined", fmt(d.installOTC)); row("Installation (monthly)", "User-defined", fmt(d.installMonth)); }
@@ -1393,24 +1484,30 @@
     });
   }
 
-  function drawOneTimeChart(nodesCost, switchCost, winOneTime, thirdOneTime) {
+  /* the SAN system uses a neutral gray in both charts: every palette slot already
+     belongs to another entity of the one-time or the monthly chart */
+  const SAN_COLOR = C3D.ink2;
+
+  function drawOneTimeChart(nodesCost, switchCost, winOneTime, thirdOneTime, sanCost) {
     if (oneTimeBreakdownChart) oneTimeBreakdownChart.destroy();
     oneTimeBreakdownChart = stackedChart($("pricingV2_oneTimeBreakdownChart"), "One-Time Breakdown", ["Hardware", "Windows License", "Third-Party"], [
       { label: "Nodes",        color: C3D_COLORS.blue,   data: [nodesCost,  0,          0] },
       { label: "Switches",     color: C3D_COLORS.orange, data: [switchCost, 0,          0] },
+      { label: "SAN System",   color: SAN_COLOR,         data: [sanCost,    0,          0] },
       { label: "Third-Party",  color: C3D_COLORS.violet, data: [0,          0,          thirdOneTime] },
       { label: "Windows Lic.", color: C3D_COLORS.yellow, data: [0,          winOneTime, 0] }
     ]);
   }
 
-  function drawMonthlyChart(host, win, avd, sql, third) {
+  function drawMonthlyChart(host, win, avd, sql, third, san) {
     if (costBreakdownChart) costBreakdownChart.destroy();
-    costBreakdownChart = stackedChart($("pricingV2_costBreakdownChart"), "Monthly Breakdown", ["Licensing", "AVD", "SQLmi", "Third-Party"], [
-      { label: "Host Fee",     color: C3D_COLORS.aqua,    data: [host, 0,   0,   0] },
-      { label: "Windows Lic.", color: C3D_COLORS.yellow,  data: [win,  0,   0,   0] },
-      { label: "AVD",          color: C3D_COLORS.magenta, data: [0,    avd, 0,   0] },
-      { label: "SQLmi",        color: C3D_COLORS.green,   data: [0,    0,   sql, 0] },
-      { label: "Third-Party",  color: C3D_COLORS.violet,  data: [0,    0,   0,   third] }
+    costBreakdownChart = stackedChart($("pricingV2_costBreakdownChart"), "Monthly Breakdown", ["Licensing", "AVD", "SQLmi", "SAN", "Third-Party"], [
+      { label: "Host Fee",     color: C3D_COLORS.aqua,    data: [host, 0,   0,   0,   0] },
+      { label: "Windows Lic.", color: C3D_COLORS.yellow,  data: [win,  0,   0,   0,   0] },
+      { label: "AVD",          color: C3D_COLORS.magenta, data: [0,    avd, 0,   0,   0] },
+      { label: "SQLmi",        color: C3D_COLORS.green,   data: [0,    0,   sql, 0,   0] },
+      { label: "SAN Support",  color: SAN_COLOR,          data: [0,    0,   0,   san, 0] },
+      { label: "Third-Party",  color: C3D_COLORS.violet,  data: [0,    0,   0,   0,   third] }
     ]);
   }
 
@@ -1869,6 +1966,11 @@
   /* ---- events ---- */
   $("pricingV2_calcBtn").addEventListener("click", calculate);
   $("pricingV2_exportPdfBtn").addEventListener("click", exportPdf);
+  /* SAN plan of a Storage Calculator that calculated before this page section loaded */
+  try {
+    const plan = JSON.parse(sessionStorage.getItem("azureLocalCalculator.sanPlan") || "null");
+    if (plan && plan.type === "san") onSync(Object.assign(plan, { source: "storage" }));
+  } catch (e) {}
   listenOdinImport("pricing", applyOdinConfig);
 })();
 </script>

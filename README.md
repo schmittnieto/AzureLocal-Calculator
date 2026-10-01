@@ -74,6 +74,7 @@ Estimates the total cost of ownership (TCO) for an Azure Local deployment, inclu
 **V2 key features:**
 - Multi-currency support: EUR, USD, GBP, CHF
 - **Infrastructure**: nodes and switches (one-time cost)
+- **SAN System** (L2 models): SAN vendor, physical usable capacity, array price (one-time) and support (monthly), shown in the overview with the price per TB and in gray in both breakdown charts
 - **Licensing**:
   - Azure Local deployment models: L1 hyperconverged without external storage, L2 disaggregated with SAN storage, L2 hyperconverged with external storage and L3 disconnected operations
   - Azure Local Host Fee: 10/core/month for L1, 20.10/core/month for both L2 variants and a user-provided rate for L3
@@ -131,6 +132,8 @@ All cluster types ODIN exports are supported: Single Node, Hyperconverged, Rack 
 | Pricing V2 | Deployment model (L1, L2 disaggregated with SAN storage, L3 for disconnected), node count, physical cores per node (the management cluster fields for an ALDO management cluster design), switch count, AVD vCPUs |
 
 The switch count follows the ODIN Sizer network model: 2 ToR and 1 BMC switch per rack (Rack Aware uses 2 racks), a single BMC switch for Single Node, and for Disaggregated Storage 2 ToR and 1 BMC per rack plus 2 FC switches per rack for FC SAN and the spine switches. When a Designer file defines the ToR switch count, that value is used.
+
+**Storage and Pricing in sync:** a change of the deployment type in the Storage Calculator selects the matching deployment model in the Pricing Calculator (hyperconverged with external SAN to L2, disaggregated to L2 disaggregated, ALDO management cluster to L3, Storage Spaces Direct to L1 unless L3 is selected) and the other way around, on the same page and in other open tabs. Every SAN plan also fills in the vendor and the physical capacity of the Pricing SAN System section. ODIN imports set all calculators to the same cluster type.
 
 The Simple and Four-Way Mirror resiliency options (single node and rack aware clusters) only appear in the Storage Calculator when an imported configuration uses them.
 

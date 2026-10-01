@@ -202,7 +202,7 @@
   <!-- Card 4: External SAN (hybrid and disaggregated deployments) -->
   <div class="card" id="storageV2_sanCard" style="display:none">
     <h3>External SAN Storage</h3>
-    <p style="font-size:.85em;color:inherit;margin:0 0 12px">Block storage presented to all nodes over Fibre Channel or iSCSI and used as NTFS Cluster Shared Volumes. Requires Azure Local 2604 or later and a supported array.</p>
+    <p style="font-size:.85em;color:inherit;margin:0 0 12px">Block storage presented to all nodes over Fibre Channel or iSCSI and used as NTFS Cluster Shared Volumes. Requires Azure Local 2604 or later and a supported array. The vendor and the physical capacity are passed to the SAN System section of the Pricing Calculator.</p>
     <div class="form-grid">
       <div class="form-group">
         <label for="storageV2_sanVendor">SAN Vendor</label>
@@ -612,16 +612,64 @@
     rows.push("</tbody>");
     $("storageV2_overviewTable").innerHTML = rows.join("");
     $("storageV2_exportPdfBtn").style.display = "inline-block";
+    syncSanPlan(p);
   }
 
-  $("storageV2_deployType").addEventListener("change", function() {
+  function setDeployType(type) {
+    $("storageV2_deployType").value = type;
     if (isAldo()) {
       $("storageV2_singleNode").checked = false;
       $("storageV2_nodeCountGroup").style.display = "";
       $("storageV2_nodeCount").value = ALDO_NODES;
     }
     applyDeployType();
+  }
+  $("storageV2_deployType").addEventListener("change", function(e) {
+    setDeployType(this.value);
+    if (e.isTrusted) syncPost({ type: "deployment", storage: deployType() });
   });
+
+  /* ================================================================
+     DEPLOYMENT SYNC (Storage <-> Pricing)
+     A user change of the deployment type is passed to the Pricing
+     Calculator (same page or other tabs), its deployment model comes back
+     here, and every SAN plan is sent to its SAN System section. Received
+     changes are never posted again, so the calculators can't loop.
+     ================================================================ */
+  var SYNC_EVENT = "azurelocal-calculator-sync";
+  var syncChannel = null;
+  try { if (typeof BroadcastChannel === "function") syncChannel = new BroadcastChannel(SYNC_EVENT); } catch (e) {}
+  function syncPost(msg) {
+    msg.source = "storage";
+    try {
+      if (syncChannel) syncChannel.postMessage(msg);
+      else window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: msg }));
+    } catch (e) {}
+  }
+  /* the plan is also kept for the browser session, for a Pricing Calculator that loads later */
+  function syncSanPlan(p) {
+    var msg = { type: "san", vendor: p.vendor.name, physicalTB: Math.ceil(p.physical * 100) / 100 };
+    try { sessionStorage.setItem("azureLocalCalculator.sanPlan", JSON.stringify(msg)); } catch (e) {}
+    syncPost(msg);
+  }
+  /* Pricing deployment model -> deployment type, keeping a compatible current type */
+  function typeForModel(model, current) {
+    if (model === "l3") return "aldo-mgmt";
+    if (model === "l2-disagg") return "disaggregated";
+    if (model === "l2") return "hybrid";
+    if (model === "l2-oem") return current === "hybrid" || current === "disaggregated" ? current : "hybrid";
+    return "s2d";
+  }
+  function onSync(msg) {
+    if (!msg || msg.source === "storage" || msg.type !== "deployment" || !msg.pricing) return;
+    var type = typeForModel(msg.pricing, deployType());
+    if (type === deployType()) return;
+    var shown = $("storageV2_resultBox").style.display === "block";
+    setDeployType(type);
+    if (shown) $("storageV2_calcBtn").click();
+  }
+  if (syncChannel) syncChannel.addEventListener("message", function(ev) { onSync(ev.data); });
+  else window.addEventListener(SYNC_EVENT, function(ev) { onSync(ev.detail); });
   sanVendors.forEach(function(v, i) {
     var opt = document.createElement("option");
     opt.value = i; opt.textContent = v.name;
@@ -797,6 +845,7 @@
     var d          = calcCapacity(nodes, driveCount, driveCap, selectedResiliency, aldoExtraTB());
     var san        = deployTypes[deployType()].san ? sanPlan() : null;
     d.san = san;
+    if (san) syncSanPlan(san);
 
     var rb = $("storageV2_resultBox");
     rb.style.display = "block";
@@ -852,6 +901,7 @@
     }
 
     var aldo = isAldo(), san = deployTypes[deployType()].san ? sanPlan() : null;
+    if (san) syncSanPlan(san);
     var rb = $("storageV2_resultBox");
     rb.style.display = "block";
     rb.innerHTML =
