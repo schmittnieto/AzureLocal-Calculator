@@ -133,6 +133,19 @@
         <label for="pricingV2_l3HostRate">L3 Host Fee per Physical Core / Month</label>
         <input type="number" id="pricingV2_l3HostRate" placeholder="Enter a planning rate or account-specific quote" min="0.01" step="0.01">
       </div>
+      <div class="form-group" id="pricingV2_l3MgmtNodesGroup" style="display:none">
+        <label for="pricingV2_l3MgmtNodes">ALDO Management Cluster Nodes</label>
+        <input type="number" id="pricingV2_l3MgmtNodes" value="3" min="0" max="16" step="1">
+      </div>
+      <div class="form-group" id="pricingV2_l3MgmtCoresGroup" style="display:none">
+        <label for="pricingV2_l3MgmtCores">Physical Cores per Management Node</label>
+        <input type="number" id="pricingV2_l3MgmtCores" value="24" min="1" max="384" step="1">
+      </div>
+      <div class="form-group full" id="pricingV2_l3MgmtPriceGroup" style="display:none">
+        <label for="pricingV2_l3MgmtNodePrice">Price per Management Node</label>
+        <input type="number" id="pricingV2_l3MgmtNodePrice" value="50000" min="0" step="100">
+        <div style="font-size:.82em;margin-top:6px">Disconnected operations bill the physical cores of the workload clusters and of the dedicated management cluster that runs the local control plane. Production management clusters have 3 nodes with at least 24 physical cores each. Set 0 nodes if the management cluster is already billed.</div>
+      </div>
       <div class="form-group full">
         <label for="pricingV2_coresPerNode">Physical Cores per Node</label>
         <input type="number" id="pricingV2_coresPerNode" value="16" min="1" max="128" step="1">
@@ -264,6 +277,7 @@
         <label for="pricingV2_avdHours">AVD Usage Hours / Month</label>
         <input type="number" id="pricingV2_avdHours" value="280" min="1" max="730" step="1">
       </div>
+      <p id="pricingV2_avdNote" class="warning form-group full" style="display:none;font-size:.82em;margin:0">Azure Virtual Desktop isn't available with disconnected operations (L3), so no AVD cost is included.</p>
       <div class="form-group">
         <label for="pricingV2_sqlVcores">SQL Managed Instance vCores</label>
         <input type="number" id="pricingV2_sqlVcores" placeholder="e.g., 4" step="1" min="0">
@@ -343,7 +357,7 @@
     <p>Actual costs may vary depending on vendor quotes, hardware configurations, and licensing agreements.</p>
     <p>
       <strong>Azure Local Deployment Model Disclaimer:</strong><br>
-      L1 applies to cloud-connected hyperconverged deployments without external storage. L2 applies to disaggregated deployments with SAN storage (up to 64 machines) and to hyperconverged deployments with external storage. Both use the 20.10/core/month host fee. An Azure Local OEM license with external storage uses the listed 10/core/month special rate. L3 applies to disconnected operations with a locally hosted control plane. Microsoft does not publish an L3 host fee, so the calculator requires a user-provided planning rate or account-specific quote. Azure Local host fees and the Windows Server subscription have a free trial for the first 60 days after registration. See the
+      L1 applies to cloud-connected hyperconverged deployments without external storage. L2 applies to disaggregated deployments with SAN storage (up to 64 machines) and to hyperconverged deployments with external storage. Both use the 20.10/core/month host fee. An Azure Local OEM license with external storage uses the listed 10/core/month special rate. L3 applies to disconnected operations with a locally hosted control plane. Microsoft does not publish an L3 host fee, so the calculator requires a user-provided planning rate or account-specific quote. L3 is licensed per physical core on an annual capacity term, billed monthly, and includes the cores of the dedicated management cluster that runs the control plane, so the calculator adds the management cluster nodes and cores (3 nodes with 24 cores by default) and applies no trial to the L3 host fee. Azure Hybrid Benefit can't waive the L3 host fee, but it can still cover Windows Server VMs. Azure Local host fees and the Windows Server subscription have a free trial for the first 60 days after registration. See the
       <a href="https://azure.microsoft.com/en-us/pricing/details/azure-local/#pricing" target="_blank">Azure Local pricing page</a>,
       <a href="https://learn.microsoft.com/en-us/azure/azure-local/overview/disaggregated-overview?view=azloc-2606" target="_blank">disaggregated deployment overview</a> and
       <a href="https://learn.microsoft.com/en-us/azure/azure-local/manage/disconnected-operations-overview?view=azloc-2606" target="_blank">disconnected operations overview</a>.
@@ -367,7 +381,7 @@
     </p>
     <p>
       <strong>AVD and SQLmi Disclaimer:</strong><br>
-      AVD costs are estimated at 0.01 per vCPU per hour. SQLmi pricing depends on tier, licensing model, and reservation term. These calculations are illustrative. For more info visit
+      AVD costs are estimated at 0.01 per vCPU per hour. AVD isn't among the services of disconnected operations, so it is excluded for L3. SQLmi pricing depends on tier, licensing model, and reservation term. These calculations are illustrative. For more info visit
       <a href="https://azure.microsoft.com/en-us/pricing/details/azure-arc/data-services/" target="_blank">Azure Arc Data Services Pricing</a>.
       Always refer to official Microsoft documentation for up-to-date pricing.
     </p>
@@ -406,6 +420,12 @@
     const nodes = $("pricingV2_nodes");
 
     $("pricingV2_l3RateContainer").style.display = model === "l3" ? "flex" : "none";
+    for (const id of ["pricingV2_l3MgmtNodesGroup", "pricingV2_l3MgmtCoresGroup", "pricingV2_l3MgmtPriceGroup"]) {
+      $(id).style.display = model === "l3" ? "flex" : "none";
+    }
+    /* AVD isn't a supported service of disconnected operations */
+    $("pricingV2_avdVCPUs").disabled = $("pricingV2_avdHours").disabled = model === "l3";
+    $("pricingV2_avdNote").style.display = model === "l3" ? "block" : "none";
     hostWaiver.disabled = !isL1;
     if (!isL1) hostWaiver.checked = false;
     const ahbNote = $("pricingV2_ahbNote");
@@ -455,14 +475,23 @@
     const nodeUnit   = num($("pricingV2_pricePerNode"));
     const switches   = num($("pricingV2_switches"));
     const switchUnit = num($("pricingV2_pricePerSwitch"));
-    const nodesCost  = nodes * nodeUnit;
+    const deploymentModel = $("pricingV2_deploymentModel").value;
+    const deployment = deploymentModels[deploymentModel];
+    /* L3: the dedicated ALDO management cluster is bought and billed as well */
+    const isL3 = deploymentModel === "l3";
+    const mgmtNodes     = isL3 ? Math.max(Math.round(num($("pricingV2_l3MgmtNodes"))), 0) : 0;
+    const mgmtCoresNode = isL3 ? num($("pricingV2_l3MgmtCores")) : 0;
+    const mgmtNodeUnit  = num($("pricingV2_l3MgmtNodePrice"));
+    const mgmtCores     = mgmtNodes * mgmtCoresNode;
+    const mgmtNodesCost = mgmtNodes * mgmtNodeUnit;
+
+    const nodesCost  = nodes * nodeUnit + mgmtNodesCost;
     const switchCost = switches * switchUnit;
     const hwCost     = nodesCost + switchCost;
 
     const coresPerNode = num($("pricingV2_coresPerNode"));
     const totalCores   = nodes * coresPerNode;
-    const deploymentModel = $("pricingV2_deploymentModel").value;
-    const deployment = deploymentModels[deploymentModel];
+    const billedCores  = totalCores + mgmtCores;
     const l3RateInput = $("pricingV2_l3HostRate");
     const hostRate = deploymentModel === "l3" ? num(l3RateInput) : deployment.rate;
     if (deploymentModel === "l3" && hostRate <= 0) {
@@ -471,7 +500,7 @@
       return;
     }
     const hostFeeWaived = deploymentModel === "l1" && $("pricingV2_waiveHostFee").checked;
-    const hostFee = hostFeeWaived ? 0 : totalCores * hostRate;
+    const hostFee = hostFeeWaived ? 0 : billedCores * hostRate;
 
     let winMonthly = 0, winOneTime = 0;
     let winLicenseMode = "default";
@@ -500,8 +529,8 @@
     const thirdOneTime = backupOTC + logsOTC + installOTC + partnerOTC + otherOTC;
     const thirdMonthly = backupMonth + logsMonth + installMonth + partnerMonth + otherMonth;
 
-    const avdVCPUs = num($("pricingV2_avdVCPUs"));
-    const avdHours = num($("pricingV2_avdHours"));
+    const avdVCPUs = isL3 ? 0 : num($("pricingV2_avdVCPUs"));
+    const avdHours = isL3 ? 0 : num($("pricingV2_avdHours"));
     const avdCost  = avdVCPUs * 0.01 * avdHours;
 
     const sqlVcores = num($("pricingV2_sqlVcores"));
@@ -516,7 +545,8 @@
     const oneTimeTotal = hwCost + winOneTime + thirdOneTime;
     const monthlyTotal = hostFee + winMonthly + thirdMonthly + avdCost + sqlCost;
     const trialApplied = $("pricingV2_applyTrial").checked;
-    const trialEligibleMonthly = hostFee + (winLicenseMode === "default" ? winMonthly : 0);
+    /* disconnected operations are billed on an annual capacity term, so the trial covers no L3 host fee */
+    const trialEligibleMonthly = (isL3 ? 0 : hostFee) + (winLicenseMode === "default" ? winMonthly : 0);
     const trialSavings = trialApplied ? trialEligibleMonthly * 2 : 0;
     const yearlyTotal  = oneTimeTotal + monthlyTotal * 12 - trialSavings;
     const threeYearTotal = oneTimeTotal + monthlyTotal * 36 - trialSavings;
@@ -540,7 +570,8 @@
     buildOverview({
       nodes, nodeUnit, nodesCost,
       switches, switchUnit, switchCost, hwCost,
-      coresPerNode, totalCores,
+      coresPerNode, totalCores, billedCores,
+      mgmtNodes, mgmtCoresNode, mgmtCores, mgmtNodeUnit, mgmtNodesCost,
       deploymentModel, deploymentLabel: deployment.label, hostRate,
       hostFeeWaived, hostFee,
       winLicenseMode,
@@ -576,15 +607,20 @@
     rows.push("<thead><tr><th>Item</th><th>Calculation</th><th>Amount</th></tr></thead><tbody>");
 
     sec("Infrastructure (One-Time)");
-    row("Nodes Cost", d.nodes + " nodes x " + fmt(d.nodeUnit) + "/node", fmt(d.nodesCost));
+    row("Nodes Cost", d.nodes + " nodes x " + fmt(d.nodeUnit) + "/node", fmt(d.nodesCost - d.mgmtNodesCost));
+    if (d.mgmtNodes > 0) row("ALDO Management Cluster Nodes", d.mgmtNodes + " nodes x " + fmt(d.mgmtNodeUnit) + "/node", fmt(d.mgmtNodesCost));
     row("Switches Cost", d.switches + " switches x " + fmt(d.switchUnit) + "/switch", fmt(d.switchCost));
     total("Total Hardware", fmt(d.hwCost));
 
     sec("Licensing");
     row("Azure Local Deployment Model", d.deploymentLabel, d.deploymentModel.toUpperCase());
     row("Total Physical Cores", d.nodes + " nodes x " + d.coresPerNode + " cores/node", d.totalCores + " cores");
+    if (d.mgmtCores > 0) {
+      row("ALDO Management Cluster Cores", d.mgmtNodes + " nodes x " + d.mgmtCoresNode + " cores/node (control plane)", d.mgmtCores + " cores");
+      row("Billed Physical Cores", d.totalCores + " workload + " + d.mgmtCores + " management", d.billedCores + " cores");
+    }
     row("Azure Local Host Rate", d.deploymentModel === "l3" ? "User-provided rate" : "Published rate", fmt(d.hostRate) + "/core/month");
-    row("Azure Local Host Fee (monthly)", d.hostFeeWaived ? "Waived through Azure Hybrid Benefit" : d.totalCores + " cores x " + fmt(d.hostRate) + "/core" + (d.deploymentModel === "l1" ? "" : " (no Azure Hybrid Benefit)"), fmt(d.hostFee));
+    row("Azure Local Host Fee (monthly)", d.hostFeeWaived ? "Waived through Azure Hybrid Benefit" : d.billedCores + " cores x " + fmt(d.hostRate) + "/core" + (d.deploymentModel === "l1" ? "" : " (no Azure Hybrid Benefit)"), fmt(d.hostFee));
 
     if (d.winLicenseMode === "custom") {
       row("Windows License (monthly)", "Custom: " + fmt(d.winMonthly / d.nodes) + "/node x " + d.nodes + " nodes", fmt(d.winMonthly));
@@ -595,7 +631,7 @@
       row("Windows License (monthly)", d.totalCores + " cores x " + c + "23.30/core", fmt(d.winMonthly));
     }
 
-    row("Free 60-Day Trial", d.trialApplied ? "Applied to eligible host and Windows subscription fees" : "Not applied", d.trialSavings > 0 ? "-" + fmt(d.trialSavings) : fmt(0));
+    row("Free 60-Day Trial", !d.trialApplied ? "Not applied" : d.deploymentModel === "l3" ? "Windows subscription only (L3 is billed on an annual capacity term)" : "Applied to eligible host and Windows subscription fees", d.trialSavings > 0 ? "-" + fmt(d.trialSavings) : fmt(0));
 
     sec("Related / Third-Party");
     if (d.backupOTC || d.backupMonth)   { row("Backup (OTC)", "User-defined", fmt(d.backupOTC));   row("Backup (monthly)", "User-defined", fmt(d.backupMonth)); }
@@ -607,7 +643,7 @@
     total("Related Total (monthly)", fmt(d.thirdMonthly));
 
     sec("Azure Services (Monthly)");
-    row("AVD Cost", d.avdVCPUs + " vCPUs x " + c + "0.01/vCPU/hr x " + d.avdHours + " hrs", fmt(d.avdCost));
+    row("AVD Cost", d.deploymentModel === "l3" ? "Not available with disconnected operations" : d.avdVCPUs + " vCPUs x " + c + "0.01/vCPU/hr x " + d.avdHours + " hrs", fmt(d.avdCost));
     row("SQLmi Rate", d.sqlTier + " / " + d.sqlLic + " / " + d.sqlTerm, fmt(d.sqlMonthlyRate) + "/vCore/month");
     row("SQLmi Cost", d.sqlVcores + " vCores x " + c + d.sqlHourlyRate.toFixed(4) + "/hr x " + d.sqlHours + " hrs", fmt(d.sqlCost));
 
@@ -1788,16 +1824,19 @@
     updateDeploymentFields();
     applied.push(["Deployment Model", deploymentModels[model].label]);
 
+    /* an ALDO management cluster design describes the management cluster, not the workload clusters */
+    const aldoMgmt = cfg.clusterType === "aldo-mgmt";
     if (cfg.nodes) {
-      const nodes = $("pricingV2_nodes");
+      const nodes = $(aldoMgmt ? "pricingV2_l3MgmtNodes" : "pricingV2_nodes");
       nodes.value = Math.min(cfg.nodes, +nodes.max);
       if (cfg.nodes > +nodes.max) notes.push("ODIN uses " + cfg.nodes + " nodes. This deployment model supports up to " + nodes.max + " nodes, so " + nodes.max + " was applied.");
-      applied.push(["Nodes", nodes.value]);
+      applied.push([aldoMgmt ? "ALDO Management Cluster Nodes" : "Nodes", nodes.value]);
     }
+    if (aldoMgmt) notes.push("The ODIN design is the disconnected operations management cluster. Enter the workload cluster nodes and cores that it manages, since both are billed.");
     if (cfg.cpu) {
       const cores = cfg.cpu.coresPerSocket * cfg.cpu.sockets;
-      $("pricingV2_coresPerNode").value = cores;
-      applied.push(["Physical Cores per Node", cores + " (" + cfg.cpu.sockets + " x " + cfg.cpu.coresPerSocket + " cores)"]);
+      $(aldoMgmt ? "pricingV2_l3MgmtCores" : "pricingV2_coresPerNode").value = cores;
+      applied.push([aldoMgmt ? "Physical Cores per Management Node" : "Physical Cores per Node", cores + " (" + cfg.cpu.sockets + " x " + cfg.cpu.coresPerSocket + " cores)"]);
     } else {
       notes.push("The file has no CPU data. Physical cores per node were not changed.");
     }
@@ -1805,7 +1844,9 @@
       $("pricingV2_switches").value = cfg.network.total;
       applied.push(["Switches", cfg.network.total + " (" + cfg.network.detail + ", ODIN network model)"]);
     }
-    if (cfg.avdVcpus > 0) {
+    if (cfg.avdVcpus > 0 && model === "l3") {
+      notes.push("The ODIN design has " + Math.ceil(cfg.avdVcpus) + " AVD vCPUs, but Azure Virtual Desktop isn't available with disconnected operations, so no AVD cost was applied.");
+    } else if (cfg.avdVcpus > 0) {
       $("pricingV2_avdVCPUs").value = Math.ceil(cfg.avdVcpus);
       applied.push(["AVD vCPUs", String(Math.ceil(cfg.avdVcpus))]);
     }

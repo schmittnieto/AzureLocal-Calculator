@@ -26,6 +26,12 @@ Estimates raw, effective, and usable storage capacity based on cluster configura
 - Single Node and multi-node cluster modes (2-16 nodes)
 - Storage types: Full-Flash (NVMe/SSD), 2-Tier (Cache + Capacity), 3-Tier (Cache + Performance + Capacity)
 - Resiliency options per platform and node count (Mirror, Parity, Mirror-Accelerated Parity)
+- **Deployment Type** selector:
+  - **Hyperconverged** (Storage Spaces Direct)
+  - **Hyperconverged with external SAN**: Storage Spaces Direct plus SAN volumes
+  - **Disaggregated**: SAN only, up to 64 nodes, internal drives are boot drives
+  - **Disconnected operations (ALDO) management cluster**: checks the standard (6 drives) or datacenter (8 drives) minimums of at least 2 TB per drive and 3 nodes, and reserves the 2 TB disconnected operations infrastructure volume
+- **External SAN planning** (Azure Local 2604 or later): supported arrays from the Microsoft list (Dell PowerStore, Everpure FlashArray, Hitachi VSP, HPE Alletra MP 10000, Lenovo ThinkSystem DS/DM/DG, NetApp ONTAP) with their MPIO registration, Fibre Channel or iSCSI host requirements, LUN layout (one LUN per CSV), infrastructure volumes, free space headroom and data reduction to estimate the physical array capacity
 - Detailed results with raw, effective, and usable capacity breakdown
 - Interactive 3D charts (capacity donut, volume distribution) with tooltips, clickable legend and drag to rotate
 - PDF export and browser print support
@@ -46,6 +52,7 @@ Estimates the physical CPU requirements for a given virtual workload across an A
   - **Nodes to CPU**: provide the number of nodes and get CPU model recommendations
   - **CPU to Nodes**: select a CPU model and get the recommended number of nodes
 - **Node Type** selector with the systems listed as "Current (2026 or later)" in the [Azure Local solutions catalog](https://azurelocalsolutions.azure.microsoft.com/#/catalog): limits sockets and node count to the selected system and only offers the CPU models it can use (matching CPU generation, published cores-per-socket options and socket support). Sizing then uses the smallest compatible CPU that fits, and results and charts recalculate automatically when the node type, the CPU or any input changes
+- **Cluster Type** selector: hyperconverged, disaggregated (external SAN, up to 64 nodes, only catalog systems with that architecture) or the **disconnected operations (ALDO) management cluster**, which sizes the fixed control plane appliance (24 vCPUs) with at least 24 physical cores per node, a host reservation of at least 20% of the cores, 3 nodes for production and only the catalog systems with the Disconnected operations capability
 - CPU socket selector (single socket / dual socket)
 - N+1 High Availability capacity reservation toggle
 - Management overhead and vCPU-to-core ratio configuration
@@ -73,6 +80,7 @@ Estimates the total cost of ownership (TCO) for an Azure Local deployment, inclu
   - OEM license with external storage pricing at 10/core/month
   - Azure Hybrid Benefit host fee waiver restricted to eligible L1 deployments (not available for disaggregated or any other L2 or L3 deployment)
   - Free 60-day trial applied to eligible term estimates
+  - L3 includes the dedicated ALDO management cluster: its nodes are added to the hardware cost and its cores to the billed cores (3 nodes with 24 cores by default), without the Windows Server fee and without trial on the L3 host fee (annual capacity term). Azure Virtual Desktop is not available with disconnected operations, so the AVD fields are disabled for L3
   - Windows Server Datacenter Fee (23.30/core/month), waivable via Hybrid Benefit
   - Custom Windows license pricing per node (monthly + one-time)
 - **Related costs** (one-time and monthly per category):
@@ -118,9 +126,9 @@ All cluster types ODIN exports are supported: Single Node, Hyperconverged, Rack 
 
 | Calculator | Fields imported from ODIN |
 |------------|---------------------------|
-| Storage V2 | Node count (Single Node when 1), capacity drives per node and drive size, resiliency (Simple, two-way, three-way or four-way mirror), target effective storage from the workload total including future growth |
-| CPU V2 | Total workload vCPUs including future growth (as VMs x vCPUs), vCPU to core ratio, node count, sockets, management overhead per node (ODIN host core reservation), and the ODIN CPU as a selectable model in the "I know my CPU" mode |
-| Pricing V2 | Deployment model (L1, L2 disaggregated with SAN storage, L3 for disconnected), node count, physical cores per node, switch count, AVD vCPUs |
+| Storage V2 | Deployment type (disaggregated or ALDO management cluster), node count (Single Node when 1), capacity drives per node and drive size, resiliency (Simple, two-way, three-way or four-way mirror), target effective storage from the workload total including future growth. Disaggregated designs get the SAN plan with the SAN capacity and connectivity (Fibre Channel or iSCSI) |
+| CPU V2 | Cluster type, total workload vCPUs including future growth (as VMs x vCPUs; the fixed appliance for an ALDO management cluster), vCPU to core ratio, node count, sockets, management overhead per node (ODIN host core reservation), and the ODIN CPU as a selectable model in the "I know my CPU" mode |
+| Pricing V2 | Deployment model (L1, L2 disaggregated with SAN storage, L3 for disconnected), node count, physical cores per node (the management cluster fields for an ALDO management cluster design), switch count, AVD vCPUs |
 
 The switch count follows the ODIN Sizer network model: 2 ToR and 1 BMC switch per rack (Rack Aware uses 2 racks), a single BMC switch for Single Node, and for Disaggregated Storage 2 ToR and 1 BMC per rack plus 2 FC switches per rack for FC SAN and the spine switches. When a Designer file defines the ToR switch count, that value is used.
 
@@ -128,7 +136,7 @@ The Simple and Four-Way Mirror resiliency options (single node and rack aware cl
 
 Limitations:
 - Tiered ODIN layouts are imported as their capacity drives only, because the Storage Calculator models full-flash storage.
-- The Storage Calculator supports up to 16 nodes and 24 drives per node. Larger ODIN values are capped and the summary says so. Disaggregated Storage designs use an external SAN, so their S2D capacity results do not apply.
+- The Storage Calculator supports up to 16 nodes (64 for disaggregated) and 24 drives per node. Larger ODIN values are capped and the summary says so. ODIN exports have no SAN vendor, so choose it after importing a disaggregated design.
 - Prices (nodes, switches, related costs) are not part of ODIN exports and must be entered manually.
 - For L3 (disconnected operations) the host fee must be entered before the pricing is calculated.
 

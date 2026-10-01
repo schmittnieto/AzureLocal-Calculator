@@ -130,6 +130,15 @@
   <div class="card">
     <h3>Cluster Settings</h3>
     <div class="form-grid">
+      <div class="form-group full">
+        <label for="clusterType">Cluster Type</label>
+        <select id="clusterType">
+          <option value="standard" selected>Hyperconverged (Storage Spaces Direct)</option>
+          <option value="disaggregated">Disaggregated (external SAN storage, up to 64 nodes)</option>
+          <option value="aldo-mgmt">Disconnected operations (ALDO): management cluster</option>
+        </select>
+        <div id="clusterTypeInfo" style="font-size:.82em;margin-top:6px"></div>
+      </div>
       <div class="form-group">
         <label for="nodeType">Node Type (Azure Local catalog)</label>
         <select id="nodeType"></select>
@@ -248,6 +257,11 @@
     <p>
       <strong>Newer CPU Generations Disclaimer:</strong><br>
       Newer processor generations (e.g., Intel Xeon 6 Granite Rapids/Sierra Forest, AMD EPYC 5th Gen Turin) typically offer improved IPC (Instructions Per Clock), higher core counts, better power efficiency, and enhanced virtualization features compared to older generations. This means that with a newer CPU, you may safely use a higher vCPU-to-physical-core ratio (overcommit) while maintaining the same or better performance per VM. When planning new deployments, consider selecting the latest available generation to maximize density and efficiency. Always validate performance expectations with your workload profile and OEM recommendations.
+    </p>
+    <p>
+      <strong>Cluster Type Disclaimer:</strong><br>
+      Disaggregated clusters use external SAN storage instead of Storage Spaces Direct and support up to 64 nodes. A disconnected operations (ALDO) management cluster is a dedicated cluster that only hosts the local control plane appliance: production needs 3 nodes with at least 24 physical cores, 128 GB (standard) or 512 GB (datacenter) memory, 6 or 8 data drives of at least 2 TB and a 960 GB boot drive per node. The appliance size (24 vCPUs, 78 GB) and the 20% host core reservation follow the ODIN Sizer. Only catalog systems with the Disconnected operations capability are offered for it. See
+      <a href="https://learn.microsoft.com/en-us/azure/azure-local/manage/disconnected-operations-control-plane-appliance" target="_blank">dedicated management cluster for disconnected operations</a>.
     </p>
     <p>
       <strong>No Warranty:</strong><br>
@@ -510,38 +524,38 @@
      ================================================================ */
   const CATALOG_DATE = "2026-10-01";
   const nodeTypes = [
-    { vendor: "Armada", name: "Galleon - Cruiser", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
-    { vendor: "Armada", name: "Galleon - Triton", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
-    { vendor: "DataON", name: "DataON AZL-8208i Intel Xeon 6", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 16, 24, 32], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
-    { vendor: "DataON", name: "DataON AZL-8224i Intel Xeon 6", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 16, 24, 32], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
+    { vendor: "Armada", name: "Galleon - Cruiser", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", aldo: true, note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Armada", name: "Galleon - Triton", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", aldo: true, note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "DataON", name: "DataON AZL-8208i Intel Xeon 6", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 16, 24, 32], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", aldo: true, note: "" },
+    { vendor: "DataON", name: "DataON AZL-8224i Intel Xeon 6", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 16, 24, 32], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", aldo: true, note: "" },
     { vendor: "DataON", name: "DataON AZS-8112a 5th Gen AMD EPYC", family: "AMD", model: "5th Gen EPYC", sockets: 1, cores: [8, 16, 24, 32, 36, 48], maxCores: 48, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "core options above the system maximum (48 cores) removed" },
-    { vendor: "Dell Technologies", name: "AX-4000r/z with AX-4510c", family: "Intel", model: "Xeon D 27xx", sockets: 1, cores: [8, 16, 20], maxCores: 20, nodes: [1, 16], form: "Rugged", arch: "Hyperconverged", note: "" },
-    { vendor: "Dell Technologies", name: "AX-4000r/z with AX-4520c", family: "Intel", model: "Xeon D 27xx", sockets: 1, cores: [8, 16, 20], maxCores: 20, nodes: [1, 16], form: "Rugged", arch: "Hyperconverged", note: "" },
-    { vendor: "Dell Technologies", name: "AX-660", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 20, 24, 28, 32, 40, 48, 52, 56, 60], maxCores: 120, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "core options above the system maximum (120 cores) removed" },
-    { vendor: "Dell Technologies", name: "AX-670", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
-    { vendor: "Dell Technologies", name: "AX-760", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 20, 24, 28, 32, 40, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
-    { vendor: "Dell Technologies", name: "AX-770", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
-    { vendor: "Dell Technologies", name: "PowerEdge R660, enabled with Dell Private Cloud", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
-    { vendor: "Dell Technologies", name: "PowerEdge R670, enabled with Dell Private Cloud", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
-    { vendor: "Dell Technologies", name: "PowerEdge R760, enabled with Dell Private Cloud", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
-    { vendor: "Dell Technologies", name: "PowerEdge R770, enabled with Dell Private Cloud", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
-    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant Compute DL360 Gen12 Server Premier Solution", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
-    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant Compute DL380 Gen12 Server Premier Solution", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
-    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant DL145 Gen11 Server Premier Solution", family: "AMD", model: "5th Gen EPYC", sockets: 1, cores: [16, 24, 32, 48, 64, 84], maxCores: 84, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
-    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant DL380 Gen11 Server Premier Solution for Azure Local", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
+    { vendor: "Dell Technologies", name: "AX-4000r/z with AX-4510c", family: "Intel", model: "Xeon D 27xx", sockets: 1, cores: [8, 16, 20], maxCores: 20, nodes: [1, 16], form: "Rugged", arch: "Hyperconverged", aldo: true, note: "" },
+    { vendor: "Dell Technologies", name: "AX-4000r/z with AX-4520c", family: "Intel", model: "Xeon D 27xx", sockets: 1, cores: [8, 16, 20], maxCores: 20, nodes: [1, 16], form: "Rugged", arch: "Hyperconverged", aldo: true, note: "" },
+    { vendor: "Dell Technologies", name: "AX-660", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 20, 24, 28, 32, 40, 48, 52, 56, 60], maxCores: 120, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", aldo: true, note: "core options above the system maximum (120 cores) removed" },
+    { vendor: "Dell Technologies", name: "AX-670", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", aldo: true, note: "" },
+    { vendor: "Dell Technologies", name: "AX-760", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 20, 24, 28, 32, 40, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", aldo: true, note: "" },
+    { vendor: "Dell Technologies", name: "AX-770", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", aldo: true, note: "" },
+    { vendor: "Dell Technologies", name: "PowerEdge R660, enabled with Dell Private Cloud", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated", aldo: true, note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Dell Technologies", name: "PowerEdge R670, enabled with Dell Private Cloud", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated", aldo: true, note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Dell Technologies", name: "PowerEdge R760, enabled with Dell Private Cloud", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated", aldo: true, note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Dell Technologies", name: "PowerEdge R770, enabled with Dell Private Cloud", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated", aldo: true, note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
+    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant Compute DL360 Gen12 Server Premier Solution", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", aldo: true, note: "" },
+    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant Compute DL380 Gen12 Server Premier Solution", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", aldo: true, note: "" },
+    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant DL145 Gen11 Server Premier Solution", family: "AMD", model: "5th Gen EPYC", sockets: 1, cores: [16, 24, 32, 48, 64, 84], maxCores: 84, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", aldo: true, note: "" },
+    { vendor: "Hewlett Packard Enterprise", name: "HPE ProLiant DL380 Gen11 Server Premier Solution for Azure Local", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", aldo: true, note: "" },
     { vendor: "Hitachi", name: "Hitachi Advanced Server HA810 G6", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
     { vendor: "Hitachi", name: "Hitachi Advanced Server HA820 G6", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated", note: "sockets inferred from maximum cores; core options taken from other systems with the same CPU generation" },
-    { vendor: "Lenovo", name: "ThinkAgile FX630 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
-    { vendor: "Lenovo", name: "ThinkAgile FX650 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
-    { vendor: "Lenovo", name: "ThinkAgile MX455 V3 Edge PR", family: "AMD", model: "4th Gen EPYC", sockets: 1, cores: [8, 16, 24, 32, 48, 64], maxCores: 64, nodes: [1, 4], form: "Rack", arch: "Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile FX630 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", aldo: true, note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile FX650 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", aldo: true, note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX455 V3 Edge PR", family: "AMD", model: "4th Gen EPYC", sockets: 1, cores: [8, 16, 24, 32, 48, 64], maxCores: 64, nodes: [1, 4], form: "Rack", arch: "Hyperconverged", aldo: true, note: "" },
     { vendor: "Lenovo", name: "ThinkAgile MX630 V3 CN Node", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
     { vendor: "Lenovo", name: "ThinkAgile MX630 V3 Integrated System", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
-    { vendor: "Lenovo", name: "ThinkAgile MX630 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX630 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", aldo: true, note: "" },
     { vendor: "Lenovo", name: "ThinkAgile MX650 V3 CN Node", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
     { vendor: "Lenovo", name: "ThinkAgile MX650 V3 Integrated System", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
-    { vendor: "Lenovo", name: "ThinkAgile MX650 V3 PR Node", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", note: "" },
-    { vendor: "Lenovo", name: "ThinkAgile MX650 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" },
-    { vendor: "Lenovo", name: "ThinkAgile MX650a V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", note: "" }
+    { vendor: "Lenovo", name: "ThinkAgile MX650 V3 PR Node", family: "Intel", model: "5th Gen Xeon Scalable", sockets: 2, cores: [8, 10, 12, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64], maxCores: 128, nodes: [1, 16], form: "Rack", arch: "Hyperconverged", aldo: true, note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX650 V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", aldo: true, note: "" },
+    { vendor: "Lenovo", name: "ThinkAgile MX650a V4", family: "Intel", model: "6th Gen Xeon Scalable", sockets: 2, cores: [8, 12, 16, 24, 32, 36, 48, 64, 80, 86], maxCores: 172, nodes: [1, 64], form: "Rack", arch: "Disaggregated/Hyperconverged", aldo: true, note: "" }
   ];
 
   /* cpuDatabase generations that belong to each catalog CPU generation. The Xeon 6
@@ -704,7 +718,7 @@
       delete sockets.dataset.forced;
     }
     nodeCount.min = p ? p.nodes[0] : 1;
-    nodeCount.max = p ? p.nodes[1] : 16;
+    nodeCount.max = Math.min(p ? p.nodes[1] : 64, clusterTypes[clusterType()].maxNodes);
     chosenCpuName = null;
     fillCpuSelect();
     updateNodeTypeInfo();
@@ -730,6 +744,90 @@
     if (selectedNodeType()) { fillCpuSelect(); updateNodeTypeInfo(); }
   });
 
+  /* ================================================================
+     CLUSTER TYPE
+     Disconnected operations (ALDO) management cluster values: Microsoft Learn
+     "Dedicated management cluster for disconnected operations" (3 nodes,
+     24 physical cores per node, up to 16 machines) and the ODIN Sizer
+     (control plane appliance IRVM1 with 24 vCPUs and 78 GB memory, host
+     reservation of 20% of the physical cores with a minimum of 2).
+     ================================================================ */
+  const ALDO = { minCores: 24, nodes: 3, applianceVcpus: 24, applianceMemGB: 78, reservePct: 0.20, reserveMin: 2 };
+  const clusterTypes = {
+    standard:        { label: "Hyperconverged (Storage Spaces Direct)", arch: "Hyperconverged", maxNodes: 16 },
+    disaggregated:   { label: "Disaggregated (external SAN storage)", arch: "Disaggregated", maxNodes: 64 },
+    "aldo-mgmt":     { label: "Disconnected operations (ALDO) management cluster", arch: "Hyperconverged", maxNodes: 16 }
+  };
+  const clusterType = () => clusterTypes[$("clusterType").value] ? $("clusterType").value : "standard";
+  const isAldo = () => clusterType() === "aldo-mgmt";
+  /* catalog systems a cluster type can use: matching architecture, plus the catalog
+     "Disconnected operations" solution capability for the ALDO management cluster */
+  const nodeTypeAllowed = p => p.arch.split("/").includes(clusterTypes[clusterType()].arch) && (!isAldo() || !!p.aldo);
+  /* host cores reserved per node: the user value, for ALDO at least 20% of the physical cores (min 2) */
+  const hostReserve = (physical, mgmt) => isAldo() ? Math.max(mgmt, Math.ceil(ALDO.reservePct * physical), ALDO.reserveMin) : mgmt;
+  /* smallest physical cores per node that leave the needed cores after the host reservation */
+  function minPhysicalPerNode(needed, mgmt) {
+    let p = needed + mgmt;
+    while (p - hostReserve(p, mgmt) < needed) p++;
+    return isAldo() ? Math.max(p, ALDO.minCores) : p;
+  }
+
+  function applyClusterType() {
+    const aldo = isAldo(), nt = $("nodeType");
+    /* the management cluster only runs the control plane appliance */
+    for (const id of ["vmCount", "vcpusPerVm"]) {
+      const el = $(id);
+      if (aldo && !el.disabled) { el.dataset.userValue = el.value; el.disabled = true; }
+      else if (!aldo && el.disabled) { el.value = el.dataset.userValue || el.value; el.disabled = false; delete el.dataset.userValue; }
+    }
+    if (aldo) { $("vmCount").value = 1; $("vcpusPerVm").value = ALDO.applianceVcpus; }
+
+    for (const opt of nt.querySelectorAll("option")) {
+      if (opt.value === "") continue;
+      const ok = nodeTypeAllowed(nodeTypes[+opt.value]);
+      opt.disabled = !ok;
+      opt.title = ok ? "" : (isAldo() ? "No Disconnected operations capability in the Azure Local catalog" : "Not available as " + clusterTypes[clusterType()].arch + " in the Azure Local catalog");
+    }
+    if (selectedNodeType() && !nodeTypeAllowed(selectedNodeType())) nt.value = "";
+    applyNodeType();
+    if (+$("nodeCount").value > +$("nodeCount").max) $("nodeCount").value = $("nodeCount").max;
+
+    const allowed = nodeTypes.filter(nodeTypeAllowed).length;
+    $("clusterTypeInfo").textContent = {
+      standard: "Storage Spaces Direct on the cluster nodes, 1 to 16 nodes.",
+      disaggregated: "Compute nodes use external SAN storage (Fibre Channel or iSCSI) instead of Storage Spaces Direct, up to 64 nodes. " + allowed + " catalog systems support this architecture.",
+      "aldo-mgmt": "Dedicated cluster that only hosts the disconnected operations control plane appliance (" + ALDO.applianceVcpus + " vCPUs, " + ALDO.applianceMemGB +
+        " GB). Production needs " + ALDO.nodes + " nodes with " + ALDO.minCores + "+ physical cores each, and the host reserves at least 20% of the cores. Workloads run on separate clusters. " +
+        allowed + " hyperconverged catalog systems have the Disconnected operations capability."
+    }[clusterType()];
+  }
+  $("clusterType").addEventListener("change", () => {
+    if (isAldo()) $("nodeCount").value = ALDO.nodes;
+    applyClusterType();
+  });
+
+  /* result lines for the cluster type */
+  function clusterTypeChecks(nodes, physicalPerNode, mgmtPerNode, userMgmt) {
+    const t = clusterType();
+    if (t === "standard") return "";
+    let html = "<strong>Cluster Type:</strong> " + clusterTypes[t].label + "<br>";
+    if (t === "disaggregated") {
+      html += "<strong>Storage:</strong> external SAN (Fibre Channel or iSCSI), internal drives are boot drives only. Plan the SAN in the Storage Calculator.<br>";
+      return html;
+    }
+    html += "<strong>Workload:</strong> disconnected operations control plane appliance (IRVM1, " + ALDO.applianceVcpus + " vCPUs, " + ALDO.applianceMemGB + " GB memory). Don't deploy other workloads on this cluster.<br>";
+    html += "<strong>Host Reservation:</strong> " + mgmtPerNode + " cores per node (the larger of " + userMgmt + " cores and 20% of " + physicalPerNode + " physical cores, min " + ALDO.reserveMin + ")<br>";
+    if (physicalPerNode < ALDO.minCores) {
+      html += '<span class="warning">' + physicalPerNode + " physical cores per node is below the " + ALDO.minCores + " physical cores the management cluster requires.</span><br>";
+    }
+    if (nodes < ALDO.nodes) {
+      html += '<span class="warning">Production management clusters need ' + ALDO.nodes + " nodes. Smaller management clusters are only for evaluation and proof of concept.</span><br>";
+    }
+    html += "<strong>Other Minimums per Node:</strong> 128 GB memory (standard, 100+ nodes managed) or 512 GB (datacenter, 1000+ nodes), 6 or 8 data drives of at least 2 TB (SSD/NVMe) and a 960 GB boot drive<br>";
+    return html;
+  }
+
+  applyClusterType();
   fillCpuSelect();
 
   /* ================================================================
@@ -761,7 +859,8 @@
     const workloadNodes  = haEnabled ? nodes - 1 : nodes;
 
     const coresNeededPerNode   = workloadNodes > 0 ? Math.ceil(c.workloadCores / workloadNodes) : c.workloadCores;
-    const minCoresPerSocket    = Math.ceil((coresNeededPerNode + c.mgmtPerNode) / c.socketsPerNode);
+    const minPhysical          = minPhysicalPerNode(coresNeededPerNode, c.mgmtPerNode);
+    const minCoresPerSocket    = Math.ceil(minPhysical / c.socketsPerNode);
 
     /* size with a real CPU: the card the user selected, else the recommended one */
     const nodeType = selectedNodeType();
@@ -779,9 +878,10 @@
     const coresPerSocket = pickedCpu ? pickedCpu.cores : minCoresPerSocket;
 
     const physicalCoresPerNode   = coresPerSocket * c.socketsPerNode;
-    const availableCoresPerNode  = Math.max(physicalCoresPerNode - c.mgmtPerNode, 0);
+    const mgmtPerNode            = hostReserve(physicalCoresPerNode, c.mgmtPerNode);
+    const availableCoresPerNode  = Math.max(physicalCoresPerNode - mgmtPerNode, 0);
     const totalAvailableCores    = availableCoresPerNode * workloadNodes;
-    const totalMgmtCores         = c.mgmtPerNode * nodes;
+    const totalMgmtCores         = mgmtPerNode * nodes;
     const totalPhysicalCores     = physicalCoresPerNode * nodes;
     const haCores                = haEnabled ? physicalCoresPerNode : 0;
     const maxVCPUs               = totalAvailableCores * c.overcommit;
@@ -802,6 +902,7 @@
     html += "<strong>Minimum Cores per Socket:</strong> " + minCoresPerSocket + " cores<br>";
     html += "<strong>Nodes for Workloads:</strong> " + workloadNodes + " of " + nodes + (haEnabled ? " (1 reserved for HA)" : "") + "<br>";
     html += "<strong>Max vCPUs Supported:</strong> " + maxVCPUs + " vCPUs<br>";
+    html += clusterTypeChecks(nodes, physicalCoresPerNode, mgmtPerNode, c.mgmtPerNode);
     html += nodeTypeChecks(nodes);
     html += sizingCpuLines(minCoresPerSocket, recommendedCpu, chosenCpu);
     if (fits) {
@@ -815,13 +916,13 @@
 
     $("chartsSection").style.display = "block";
     drawCoreChart(c.workloadCores, totalMgmtCores, haCores, totalAvailableCores);
-    drawNodeChart(nodes, physicalCoresPerNode, c.mgmtPerNode, availableCoresPerNode, c.workloadCores, workloadNodes, haEnabled);
+    drawNodeChart(nodes, physicalCoresPerNode, mgmtPerNode, availableCoresPerNode, c.workloadCores, workloadNodes, haEnabled);
 
     buildOverview({
       mode: "nodes",
       vms: c.vms, vcpusPerVm: c.vcpusPerVm, totalVCPUs: c.totalVCPUs, overcommit: c.overcommit, workloadCores: c.workloadCores,
-      nodes, socketsPerNode: c.socketsPerNode, mgmtPerNode: c.mgmtPerNode, haEnabled, workloadNodes,
-      minCoresPerSocket, coresPerSocket, physicalCoresPerNode, availableCoresPerNode,
+      nodes, socketsPerNode: c.socketsPerNode, mgmtPerNode, userMgmt: c.mgmtPerNode, haEnabled, workloadNodes,
+      coresNeededPerNode, minPhysical, minCoresPerSocket, coresPerSocket, physicalCoresPerNode, availableCoresPerNode,
       totalAvailableCores, totalMgmtCores, totalPhysicalCores, haCores,
       maxVCPUs, utilization, fits, minNodesTotal,
       cpuName: null, pickedCpu, recommendedCpu, chosenCpu
@@ -842,16 +943,18 @@
 
     const coresPerSocket        = cpu.cores;
     const physicalCoresPerNode  = coresPerSocket * c.socketsPerNode;
-    const availableCoresPerNode = Math.max(physicalCoresPerNode - c.mgmtPerNode, 0);
+    const mgmtPerNode           = hostReserve(physicalCoresPerNode, c.mgmtPerNode);
+    const availableCoresPerNode = Math.max(physicalCoresPerNode - mgmtPerNode, 0);
 
-    /* minimum workload nodes */
+    /* minimum workload nodes (the ALDO management cluster has at least 3 nodes) */
     const minWorkloadNodes = availableCoresPerNode > 0 ? Math.ceil(c.workloadCores / availableCoresPerNode) : 999;
     const haEnabled        = c.haCheckbox;
-    const minNodes         = haEnabled ? minWorkloadNodes + 1 : minWorkloadNodes;
+    const sizedNodes       = haEnabled ? minWorkloadNodes + 1 : minWorkloadNodes;
+    const minNodes         = isAldo() ? Math.max(sizedNodes, ALDO.nodes) : sizedNodes;
     const workloadNodes    = haEnabled ? minNodes - 1 : minNodes;
 
     const totalAvailableCores = availableCoresPerNode * workloadNodes;
-    const totalMgmtCores      = c.mgmtPerNode * minNodes;
+    const totalMgmtCores      = mgmtPerNode * minNodes;
     const totalPhysicalCores  = physicalCoresPerNode * minNodes;
     const haCores             = haEnabled ? physicalCoresPerNode : 0;
     const maxVCPUs            = totalAvailableCores * c.overcommit;
@@ -868,9 +971,11 @@
     html += "<strong>Physical Cores Required:</strong> " + c.workloadCores + " cores (at " + c.overcommit + ":1 ratio)<br>";
     html += "<strong>Physical Cores per Node:</strong> " + physicalCoresPerNode + " (" + c.socketsPerNode + " x " + coresPerSocket + " cores)<br>";
     html += "<strong>Available Cores per Node (for VMs):</strong> " + availableCoresPerNode + " cores<br>";
-    html += '<strong>Minimum Nodes Required:</strong> <span class="ok">' + minNodes + " nodes</span>" + (haEnabled ? " (includes +1 for HA)" : "") + "<br>";
+    html += '<strong>Minimum Nodes Required:</strong> <span class="ok">' + minNodes + " nodes</span>" +
+      (minNodes > sizedNodes ? " (management cluster minimum, the appliance needs " + sizedNodes + ")" : haEnabled ? " (includes +1 for HA)" : "") + "<br>";
     html += "<strong>Max vCPUs Supported (" + minNodes + " nodes):</strong> " + maxVCPUs + " vCPUs<br>";
     html += "<strong>Core Utilization:</strong> " + utilization.toFixed(1) + "%<br>";
+    html += clusterTypeChecks(minNodes, physicalCoresPerNode, mgmtPerNode, c.mgmtPerNode);
     html += nodeTypeChecks(minNodes);
     rb.innerHTML = html;
 
@@ -880,12 +985,12 @@
     /* charts */
     $("chartsSection").style.display = "block";
     drawCoreChart(c.workloadCores, totalMgmtCores, haCores, totalAvailableCores);
-    drawNodeChart(minNodes, physicalCoresPerNode, c.mgmtPerNode, availableCoresPerNode, c.workloadCores, workloadNodes, haEnabled);
+    drawNodeChart(minNodes, physicalCoresPerNode, mgmtPerNode, availableCoresPerNode, c.workloadCores, workloadNodes, haEnabled);
 
     buildOverview({
       mode: "cpu",
       vms: c.vms, vcpusPerVm: c.vcpusPerVm, totalVCPUs: c.totalVCPUs, overcommit: c.overcommit, workloadCores: c.workloadCores,
-      nodes: minNodes, socketsPerNode: c.socketsPerNode, mgmtPerNode: c.mgmtPerNode, haEnabled, workloadNodes,
+      nodes: minNodes, sizedNodes, socketsPerNode: c.socketsPerNode, mgmtPerNode, userMgmt: c.mgmtPerNode, haEnabled, workloadNodes,
       minCoresPerSocket: coresPerSocket, coresPerSocket, physicalCoresPerNode, availableCoresPerNode,
       totalAvailableCores, totalMgmtCores, totalPhysicalCores, haCores,
       maxVCPUs, utilization, fits: true, minNodesTotal: minNodes,
@@ -1019,12 +1124,23 @@
     row("Nodes", d.mode === "cpu" ? "Calculated" : "User-defined", d.nodes + " total" + (d.haEnabled ? " (1 HA reserved)" : ""));
     row("Workload Nodes", d.haEnabled ? d.nodes + " - 1 HA" : d.nodes + " (no HA)", d.workloadNodes + " nodes");
     row("Sockets per Node", "User-defined", d.socketsPerNode + " socket(s)");
-    row("Management Overhead per Node", "User-defined", d.mgmtPerNode + " cores");
+    if (isAldo()) {
+      row("Cluster Type", "Dedicated, runs only the control plane appliance", clusterTypes[clusterType()].label);
+      row("Management Overhead per Node", "max(" + d.userMgmt + " user-defined, 20% of " + d.physicalCoresPerNode + " cores, " + ALDO.reserveMin + ")", d.mgmtPerNode + " cores");
+    } else {
+      if (clusterType() !== "standard") row("Cluster Type", "User-defined", clusterTypes[clusterType()].label);
+      row("Management Overhead per Node", "User-defined", d.mgmtPerNode + " cores");
+    }
 
     sec(d.mode === "cpu" ? "Node Sizing (for " + d.cpuName + ")" : "CPU Sizing");
     if (d.mode === "nodes") {
-      row("Cores Needed per Node (workload + mgmt)", "ceil(" + d.workloadCores + " / " + d.workloadNodes + ") + " + d.mgmtPerNode, (d.availableCoresPerNode + d.mgmtPerNode) + " cores");
-      row("Minimum Cores per Socket", "(ceil(" + d.workloadCores + " / " + d.workloadNodes + ") + " + d.mgmtPerNode + ") / " + d.socketsPerNode + " socket(s)", d.minCoresPerSocket + " cores");
+      const perNode = "ceil(" + d.workloadCores + " / " + d.workloadNodes + ")";
+      if (isAldo()) {
+        row("Physical Cores Needed per Node", "max(" + perNode + " + 20% host reservation, " + ALDO.minCores + " management cluster minimum)", d.minPhysical + " cores");
+      } else {
+        row("Physical Cores Needed per Node (workload + mgmt)", perNode + " + " + d.userMgmt, d.minPhysical + " cores");
+      }
+      row("Minimum Cores per Socket", d.minPhysical + " / " + d.socketsPerNode + " socket(s)", d.minCoresPerSocket + " cores");
       if (d.pickedCpu) {
         row("Recommended CPU", (nodeType ? "Smallest compatible model" : "Smallest current-generation model") + " with enough cores", d.recommendedCpu.name);
         if (d.chosenCpu) row("Selected CPU", "User-selected in CPU Recommendations", d.chosenCpu.name);
@@ -1035,7 +1151,8 @@
     } else {
       row("Cores per Socket", d.cpuName, d.minCoresPerSocket + " cores");
       row("Available Cores per Node (for VMs)", d.physicalCoresPerNode + " - " + d.mgmtPerNode + " mgmt", d.availableCoresPerNode + " cores");
-      row("Min Workload Nodes", "ceil(" + d.workloadCores + " / " + d.availableCoresPerNode + ")", d.workloadNodes + " nodes");
+      row("Min Workload Nodes", "ceil(" + d.workloadCores + " / " + d.availableCoresPerNode + ")", (d.availableCoresPerNode > 0 ? Math.ceil(d.workloadCores / d.availableCoresPerNode) : 999) + " nodes");
+      if (d.nodes > d.sizedNodes) row("Management Cluster Minimum", "Production management cluster", ALDO.nodes + " nodes");
       total("Minimum Nodes Required", d.nodes + " nodes" + (d.haEnabled ? " (incl. +1 HA)" : ""));
     }
 
@@ -2241,7 +2358,14 @@
       notes.push("The node type filter was cleared, because the ODIN design defines its own CPU.");
     }
 
-    if (cfg.totals && cfg.totals.vcpus > 0) {
+    const odinType = clusterTypes[cfg.clusterType] ? cfg.clusterType : "standard";
+    $("clusterType").value = odinType;
+    applyClusterType();
+    if (odinType !== "standard") applied.push(["Cluster Type", clusterTypes[odinType].label]);
+
+    if (isAldo()) {
+      notes.push("The management cluster workload is the fixed control plane appliance (" + ALDO.applianceVcpus + " vCPUs), so the ODIN workload totals were not applied.");
+    } else if (cfg.totals && cfg.totals.vcpus > 0) {
       const total = Math.ceil(cfg.totals.vcpus * cfg.growthFactor);
       let vms = Math.max(cfg.vmEquivalents, 1);
       let perVm = Math.ceil(total / vms);
