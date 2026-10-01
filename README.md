@@ -99,6 +99,12 @@ Estimates the total cost of ownership (TCO) for an Azure Local deployment, inclu
 
 ---
 
+## Shared Design
+
+The three V2 calculators share one design: the same style block, scoped to the calculator roots, so the calculators look alike and neither style the page that embeds them nor get styled by it. The notes and disclaimers of each calculator are collapsed under "Notes and Disclaimers" (the PDF export and printing always include them), and wide tables scroll inside their own box on small screens.
+
+---
+
 ## 3D Charts
 
 The V2 calculators draw their charts with a small 3D renderer that is built into each HTML file, so every calculator is a single self-contained file without external libraries. The charts support:

@@ -3,63 +3,89 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    #storageV2_calcRoot,
-    #storageV2_calcRoot *{box-sizing:border-box}
-    #storageV2_calcRoot{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:20px 0;text-align:center}
-    #storageV2_calcRoot h3{font-size:1.5em;margin-bottom:20px}
+    /* ================================================================
+       SHARED DESIGN
+       The same block in all three V2 calculators. Every rule is scoped to
+       the three calculator roots, so it doesn't style the page that embeds
+       the calculators and the page's own rules can't override it.
+       ================================================================ */
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot),
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) *{box-sizing:border-box}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot){font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:20px 0;text-align:center}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) h3{font-size:1.5em;margin-bottom:20px}
 
-    #storageV2_calcRoot .card{margin:20px 0;padding:0;text-align:left}
-    #storageV2_calcRoot .card h3{margin:0 0 20px;font-size:1.5em}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .card{margin:20px 0;padding:0;text-align:left}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .card h3{margin:0 0 20px;font-size:1.5em}
 
-    #storageV2_calcRoot .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px}
-    @media(max-width:700px){#storageV2_calcRoot .form-grid{grid-template-columns:1fr}}
-    #storageV2_calcRoot .form-group{display:flex;flex-direction:column}
-    #storageV2_calcRoot .form-group.full{grid-column:1/-1}
-    #storageV2_calcRoot .form-group label,
-    #storageV2_calcRoot label{display:block;margin-bottom:5px;font-weight:600}
-    #storageV2_calcRoot .form-group input[type=number],
-    #storageV2_calcRoot .form-group select{
-      width:100%;
-      padding:8px;
-      border:1px solid #555;
-      border-radius:8px;
-      box-sizing:border-box;
-      margin-top:5px
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px}
+    @media(max-width:700px){:is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .form-grid{grid-template-columns:1fr}}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .form-group{display:flex;flex-direction:column}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .form-group.full{grid-column:1/-1}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) label{display:block;margin-bottom:5px;font-weight:600}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .form-group input[type=number],
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .form-group select{width:100%;padding:8px;border:1px solid #555;border-radius:8px;margin-top:5px}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .form-group select{background:#444;color:#fff}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .form-group input[type=number]:focus,
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .form-group select:focus{outline:none}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) input:disabled,
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) select:disabled{opacity:.6;cursor:not-allowed}
+
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .chk-row{display:flex;align-items:center;margin-bottom:10px}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .chk-row input[type=checkbox]{margin-right:8px;transform:scale(1.2)}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .chk-row label{margin:0;font-weight:600}
+
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .btn-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;margin-top:8px}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .btn,
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) button{background:#007aff;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:1em;font-weight:600;line-height:1.2;cursor:pointer;margin:20px 0 0}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .btn:hover,
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) button:hover{background:#005bb5}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .btn-secondary{background:#555;color:#fff}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .btn-secondary:hover{background:#3d3d3d}
+
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .mode-tabs{display:flex;border-radius:8px;overflow:hidden;border:1px solid #555;margin-bottom:16px}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .mode-tab{flex:1;padding:10px 12px;border:none;cursor:pointer;font-weight:600;font-size:.88em;background:#444;color:#fff;margin:0;border-radius:0;transition:background .2s}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .mode-tab:hover{background:#555}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .mode-tab.active,
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .mode-tab.active:hover{background:#007aff;color:#fff}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .mode-tab:not(:last-child){border-right:1px solid #555}
+
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .result-box{margin-top:20px;text-align:left;font-size:.95em;line-height:1.7}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .warning{color:#cc3300;font-weight:600}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .ok{color:#2e7d32;font-weight:600}
+
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .charts-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:20px}
+    @media(min-width:700px){:is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .charts-grid.two-col{grid-template-columns:1fr 1fr}}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .chart-wrapper{position:relative;height:320px;text-align:center}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .chart-wrapper canvas{background:#fff;border-radius:8px;width:100%!important;height:100%!important}
+
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .overview-table{width:100%;border-collapse:collapse;margin-top:15px;text-align:left;font-size:.9em}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .overview-table th,
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .overview-table td{padding:8px 10px;border-bottom:1px solid #555}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .overview-table th{font-weight:600}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .overview-table td:last-child{text-align:right}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .overview-table .section-header{font-weight:700;color:#007aff}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .overview-table .total-row{font-weight:700}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .overview-table .formula{font-size:.86em;opacity:.8}
+    /* small screens: wide tables scroll inside their own box instead of widening the page */
+    @media(max-width:700px){:is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .overview-table,:is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .compare-table{display:block;overflow-x:auto}}
+
+    /* notes and disclaimers: collapsed behind a summary line, same small print when open */
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .disclaimer{font-size:.8em;margin-top:20px;text-align:left;line-height:1.6}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .disclaimer > summary{cursor:pointer;font-weight:700;font-size:1.1em;color:#007aff;padding:6px 0;user-select:none}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .disclaimer > summary:focus{outline:none}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .disclaimer > summary:focus-visible{outline:2px solid #007aff;outline-offset:2px;border-radius:4px}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .disclaimer a{color:#007aff;text-decoration:none}
+    :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .disclaimer a:hover{text-decoration:underline}
+
+    @media print{
+      :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .btn-row,
+      :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .no-print{display:none!important}
+      :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .card,
+      :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .chart-wrapper{break-inside:avoid}
+      :is(#calcRoot,#storageV2_calcRoot,#pricingV2_calcRoot) .chart-wrapper{height:260px}
     }
-    #storageV2_calcRoot .form-group select{background:#444;color:#fff}
-    #storageV2_calcRoot .form-group input[type=number]:focus,
-    #storageV2_calcRoot .form-group select:focus{outline:none}
 
-    #storageV2_calcRoot .chk-row{display:flex;align-items:center;margin-bottom:10px}
-    #storageV2_calcRoot .chk-row input[type=checkbox]{margin-right:8px;transform:scale(1.2)}
-    #storageV2_calcRoot .chk-row label{margin:0;font-weight:600}
-
-    #storageV2_calcRoot .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
-    #storageV2_calcRoot .btn,
-    #storageV2_calcRoot button{background:#007aff;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:1em;cursor:pointer;margin-top:20px}
-    #storageV2_calcRoot .btn:hover,
-    #storageV2_calcRoot button:hover{background:#005bb5}
-    #storageV2_calcRoot .btn-secondary{background:#555;color:#fff}
-    #storageV2_calcRoot .btn-secondary:hover{background:#3d3d3d}
-
-    #storageV2_calcRoot .result-box{margin-top:20px;text-align:left;font-size:.95em;line-height:1.7}
-    #storageV2_calcRoot .warning{color:#cc3300;font-weight:600}
-    #storageV2_calcRoot .ok{color:#2e7d32;font-weight:600}
-
-    #storageV2_calcRoot .charts-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:20px}
-    @media(min-width:700px){#storageV2_calcRoot .charts-grid.two-col{grid-template-columns:1fr 1fr}}
-    #storageV2_calcRoot .chart-wrapper{position:relative;height:320px;text-align:center}
-    #storageV2_calcRoot .chart-wrapper canvas{background:#fff;border-radius:8px;width:100%!important;height:100%!important}
-
-    #storageV2_calcRoot .overview-table{width:100%;border-collapse:collapse;margin-top:15px;text-align:left;font-size:.9em}
-    #storageV2_calcRoot .overview-table th,
-    #storageV2_calcRoot .overview-table td{padding:8px 10px;border-bottom:1px solid #555}
-    #storageV2_calcRoot .overview-table th{font-weight:600}
-    #storageV2_calcRoot .overview-table td:last-child{text-align:right}
-    #storageV2_calcRoot .overview-table .section-header{font-weight:700;color:#007aff}
-    #storageV2_calcRoot .overview-table .total-row{font-weight:700}
-    #storageV2_calcRoot .overview-table .formula{font-size:.86em;opacity:.8}
-
+    /* ---- Storage Calculator: resiliency cards, drive sizes, comparison table ---- */
     #storageV2_calcRoot .res-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px}
     #storageV2_calcRoot .res-option{border:1px solid #555;border-radius:8px;padding:12px;cursor:pointer;transition:border-color .2s}
     #storageV2_calcRoot .res-option:hover:not(.disabled){border-color:#007aff}
@@ -68,19 +94,11 @@
     #storageV2_calcRoot .res-option .res-name{font-weight:700;font-size:.9em;margin-bottom:4px}
     #storageV2_calcRoot .res-option .res-detail{font-size:.78em;line-height:1.4;opacity:.85}
     #storageV2_calcRoot .res-option .res-eff{font-size:.82em;font-weight:600;color:#007aff;margin-top:4px}
-
-    #storageV2_calcRoot .mode-tabs{display:flex;border-radius:8px;overflow:hidden;border:1px solid #555;margin-bottom:16px}
-    #storageV2_calcRoot .mode-tab{flex:1;padding:10px 12px;border:none;cursor:pointer;font-weight:600;font-size:.88em;background:#444;color:#fff;margin-top:0;border-radius:0}
-    #storageV2_calcRoot .mode-tab:hover{background:#555}
-    #storageV2_calcRoot .mode-tab.active{background:#007aff;color:#fff}
-    #storageV2_calcRoot .mode-tab:not(:last-child){border-right:1px solid #555}
-
     #storageV2_calcRoot .size-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px}
     #storageV2_calcRoot .size-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #555;border-radius:8px;cursor:pointer;transition:border-color .2s;user-select:none}
     #storageV2_calcRoot .size-opt.checked{border-color:#007aff}
     #storageV2_calcRoot .size-opt input[type=checkbox]{width:16px;height:16px;accent-color:#007aff;cursor:pointer;flex-shrink:0}
     #storageV2_calcRoot .size-opt span{font-size:.88em;font-weight:500}
-
     #storageV2_calcRoot .compare-table{width:100%;border-collapse:collapse;font-size:.88em;margin-top:4px}
     #storageV2_calcRoot .compare-table th,
     #storageV2_calcRoot .compare-table td{padding:8px 10px;text-align:right;border-bottom:1px solid #555}
@@ -89,16 +107,6 @@
     #storageV2_calcRoot .compare-table th{font-weight:600}
     #storageV2_calcRoot .compare-table .infeasible{opacity:.5}
     #storageV2_calcRoot .compare-table .best td{color:#2e7d32;font-weight:700}
-
-    #storageV2_calcRoot .disclaimer{font-size:.8em;margin-top:20px;text-align:left;line-height:1.6}
-    #storageV2_calcRoot .disclaimer a{color:#007aff;text-decoration:none}
-    #storageV2_calcRoot .disclaimer a:hover{text-decoration:underline}
-
-    @media print{
-      #storageV2_calcRoot .btn-row,#storageV2_calcRoot .no-print{display:none!important}
-      #storageV2_calcRoot .card,#storageV2_calcRoot .chart-wrapper{break-inside:avoid}
-      #storageV2_calcRoot .chart-wrapper{height:260px}
-    }
   </style>
 </head>
 <body>
@@ -270,8 +278,9 @@
     <table class="overview-table" id="storageV2_overviewTable"></table>
   </div>
 
-  <!-- Disclaimers -->
-  <div class="disclaimer">
+  <!-- Notes and disclaimers (collapsed) -->
+  <details class="disclaimer">
+    <summary>Notes and Disclaimers</summary>
     <p>
       <strong>Storage Spaces Direct (S2D) Disclaimer:</strong><br>
       This calculator estimates storage capacity for Storage Spaces Direct deployments on Azure Local using Full-Flash NVMe configurations. Calculations are based on current best practices and deployment guidelines. Actual results may vary depending on firmware, driver versions, and workload patterns. Always refer to the
@@ -318,7 +327,7 @@
       <strong>No Warranty:</strong><br>
       All information in this Storage Calculator is provided "as is" with no warranties, express or implied. It does not represent official Microsoft documentation. Always verify with your hardware vendor and Microsoft documentation for accurate sizing and configuration.
     </p>
-  </div>
+  </details>
 </div>
 
 <script>
@@ -772,6 +781,10 @@
     else calculateReverse();
   });
   $("storageV2_exportPdfBtn").addEventListener("click", exportPdf);
+  /* browser printing includes the notes and disclaimers too */
+  window.addEventListener("beforeprint", function() {
+    Array.prototype.forEach.call($("storageV2_calcRoot").querySelectorAll("details"), function(d) { d.open = true; });
+  });
 
   /* ================================================================
      RESILIENCY OPTIONS UI
@@ -1816,6 +1829,8 @@
       });
 
       var clone = root.cloneNode(true);
+      /* the PDF always includes the notes and disclaimers */
+      Array.prototype.forEach.call(clone.querySelectorAll("details"), function(d) { d.open = true; });
       clone.querySelectorAll("canvas").forEach(function(c) {
         var img = document.createElement("img");
         img.src = chartImages[c.id] || "";
