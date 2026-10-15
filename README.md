@@ -1,6 +1,6 @@
 # AzureLocal-Calculator
 
-AzureLocal-Calculator is a repository that provides a set of interactive, web-based calculators for estimating key metrics in an Azure Local environment, including Storage, CPU, and Pricing estimation. Each calculator is available in an original version (V1) and an improved version (V2).
+AzureLocal-Calculator is a repository that provides interactive, web-based calculators for estimating compute, storage and cost in an Azure Local environment. The current version is the **Azure Local Calculator V3**, which sizes all three on a single page. The separate Storage, CPU and Pricing calculators stay in the repo as V2 (previous) and V1 (legacy).
 
 The calculators are organized under the `Calculators` directory and are also available for interactive use on my blog: [Azure Local Calculator](https://schmitt-nieto.com/azurelocal-calculator/).
 
@@ -10,7 +10,57 @@ The calculators are organized under the `Calculators` directory and are also ava
 
 ---
 
-## Calculators
+## Azure Local Calculator V3 (current)
+
+V3 puts compute, storage and cost sizing on one page. You pick a deployment type and size the workload, and the node count and physical cores from the compute step feed the storage and cost steps. All three estimates describe the same cluster, so there is nothing to copy between calculators.
+
+| Version | File | Description |
+|---------|------|-------------|
+| V3 | `azurelocal-calculator-v3.html` | Single-page calculator that combines CPU, storage and pricing in five steps, with planning checks per deployment type and a 3D view of the hardware. |
+
+The page has five steps:
+
+1. **Deployment type**: sets the node limits, the storage model and the host fee.
+2. **Compute**: virtual machines in, physical cores and nodes out.
+3. **Storage**: Storage Spaces Direct, external SAN or both, sized for the nodes from step 2.
+4. **Cost**: hardware, licensing, related costs and Azure services for the cluster from step 2.
+5. **Solution**: the hardware and the results as interactive 3D views.
+
+A summary bar stays at the top while you scroll. It shows the deployment type, the node count, the physical cores, the usable storage and the 3-year total.
+
+**V3 key features:**
+- **Deployment types** with their minimum Azure Local version:
+  - **Hyperconverged**: 1 to 16 nodes with Storage Spaces Direct
+  - **Rack aware cluster** (2510 or later): 1+1 to 4+4 machines across two zones, plus the storage NIC speed (10 or 25 GbE)
+  - **Hyperconverged with external SAN** (2604 or later): Storage Spaces Direct plus SAN volumes over Fibre Channel or iSCSI
+  - **Disaggregated**: 1 to 64 compute nodes on SAN storage only
+  - **Disconnected operations** (2602 or later): the workload cluster plus the dedicated management cluster. Clear the management cluster option when it already exists and is already billed
+  - **Multi-rack** (2511 or later) and **Small form factor** (preview): planning facts and a cost estimate only
+- **Planning checks** next to the deployment type list the requirements and limits of the selected type
+- **Work out** selector: switch Compute, Storage or Cost off to work on the other parts alone. With Compute off, you enter the node count and the cores per node yourself
+- **Compute**: VM count, vCPUs per VM, vCPU to core ratio, host overhead and N+1, node types from the Azure Local solutions catalog, socket count and the "I know my nodes" and "I know my CPU" modes with CPU recommendation cards. For disconnected operations the management cluster gets its own node type, profile (standard or datacenter), ratio and N+1 setting
+- **Storage**: "I know my drives" or "I have a capacity target" for Storage Spaces Direct with the resiliency options. External SAN takes the vendor, Fibre Channel or iSCSI, one LUN per CSV, data reduction and free space headroom. Disconnected operations adds the data drives of the management cluster
+- **Cost**: currency (EUR, USD, GBP, CHF), node, switch, management node and SAN prices, the host fee of the selected model (L1, L2, OEM license with external storage or L3 with your quoted rate), Windows Server guest licensing, Azure Hybrid Benefit for L1, the 60-day trial, related costs, AVD and SQL Managed Instance
+- **Solution**: a 3D hardware view with the racks, nodes, failover node, management nodes, switches and SAN array, plus 3D charts for core allocation, cores per node, volume distribution, the SAN capacity plan and cost. Drag to turn a view, double-click to reset it, hover or tap a part for its values
+- **Full overview** table with every calculation
+- **Sources**: superscript numbers next to the values point to a numbered list of the Microsoft Learn pages and catalog entries they come from
+- **Import from ODIN**: Sizer and Designer exports set the deployment type, nodes, workload, CPU, drives, resiliency, SAN connectivity, switches and AVD vCPUs. ODIN multi-rack designs map to Multi-rack, and Microsoft 365 Local designs come in as a regular cluster
+- Light and dark mode follow the page theme, and the layout adapts to the width of its container
+
+The formulas come unchanged from the three V2 calculators, and the CPU database, the catalog node types and the ODIN parser are copied from them. V3 is a single self-contained HTML file. Its styles are scoped to `#alc-root`, every element ID starts with `alc-` and the file is wrapped in `{% raw %}`, so it can be pasted into a Jekyll page as is.
+
+Limitations:
+- There is no PDF export in this version.
+- Multi-rack and small form factor aren't sized. Microsoft sells multi-rack as a fixed bill of materials and small form factor on a short list of devices, so the page shows planning facts and a cost estimate for them.
+- Microsoft 365 Local has no entry of its own, because a certified partner sizes that workload on hyperconverged or disaggregated hardware.
+- The storage model is all-flash with a single drive type.
+- In rack aware clusters, N+1 reserves one node. It doesn't reserve a full rack.
+
+---
+
+## Storage, CPU and Pricing Calculators (V1 and V2)
+
+These are the separate calculators that came before V3. V2 is the previous version and V1 is legacy.
 
 ### Storage Calculator
 
@@ -107,7 +157,7 @@ The three V2 calculators share one design: the same style block, scoped to the c
 
 ## 3D Charts
 
-The V2 calculators draw their charts with a small 3D renderer that is built into each HTML file, so every calculator is a single self-contained file without external libraries. The charts support:
+V3 and the V2 calculators draw their charts with the same small 3D renderer, built into each HTML file, so every calculator is a single self-contained file without external libraries. The charts support:
 
 - **Hover or tap** on a slice or bar to see its value, its share and, for stacked bars, every value of that category plus the total
 - **Click a legend entry** to hide or show that part of the chart
@@ -120,7 +170,7 @@ Colors are assigned per entity and stay the same in every chart (for example, Wi
 
 ## Import from ODIN
 
-All three V2 calculators include an **Import from ODIN** button that loads a configuration exported from [ODIN for Azure Local](https://azure.github.io/odinforazurelocal/). Both ODIN export formats are supported:
+V3 and all three V2 calculators include an **Import from ODIN** button that loads a configuration exported from [ODIN for Azure Local](https://azure.github.io/odinforazurelocal/). Both ODIN export formats are supported:
 
 - **Sizer** "Export JSON" file (`{ _meta, data }` or the bare `data` object)
 - **Designer** "Export Configuration" file (`{ version, exportedAt, state }`). Hardware and workload data is only available when the design was started from the Sizer.
@@ -129,7 +179,9 @@ The file is read locally in the browser and is never uploaded. After the import,
 
 All cluster types ODIN exports are supported: Single Node, Hyperconverged, Rack Aware, Disaggregated Storage and Disconnected Operations (management cluster).
 
-**One import for all calculators:** a configuration imported in one calculator is applied to the other calculators as well, both on the same page and in other open tabs of the site. It is also kept for the browser session, so the other calculator pages load it automatically when they are opened. Closing the browser tab clears it.
+In V3 one import fills the compute, storage and cost steps at once (see [Azure Local Calculator V3](#azure-local-calculator-v3-current) for the fields). V3 doesn't share imports with the V2 calculators.
+
+**One import for all V2 calculators:** a configuration imported in one V2 calculator is applied to the other V2 calculators as well, both on the same page and in other open tabs of the site. It is also kept for the browser session, so the other calculator pages load it automatically when they are opened. Closing the browser tab clears it.
 
 | Calculator | Fields imported from ODIN |
 |------------|---------------------------|
@@ -158,13 +210,14 @@ AzureLocal-Calculator/
 ├── Calculators/
 │   ├── StorageCalculator/
 │   │   ├── StorageCalculator.html       # V1 (legacy)
-│   │   └── StorageCalculatorV2.html     # V2 (current)
+│   │   └── StorageCalculatorV2.html     # V2 (previous)
 │   ├── CPUCalculator/
 │   │   ├── CPUCalculator.html           # V1 (legacy)
-│   │   └── CPUCalculatorV2.html         # V2 (current)
-│   └── PricingCalculator/
-│       ├── PricingCalculator.html       # V1 (legacy)
-│       └── PricingCalculatorV2.html     # V2 (current)
+│   │   └── CPUCalculatorV2.html         # V2 (previous)
+│   ├── PricingCalculator/
+│   │   ├── PricingCalculator.html       # V1 (legacy)
+│   │   └── PricingCalculatorV2.html     # V2 (previous)
+│   └── azurelocal-calculator-v3.html    # V3 (current): compute, storage and cost on one page
 ├── README.md
 └── LICENSE
 ```
